@@ -1,7 +1,7 @@
 import React from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import {
-  School, Users, TrendingUp, BookOpen, GraduationCap,
+  School, Users, BookOpen, GraduationCap,
   ArrowUpRight, MoreHorizontal, CheckCircle2, Clock, AlertCircle
 } from 'lucide-react';
 
