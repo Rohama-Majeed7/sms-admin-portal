@@ -1,6 +1,16 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight, Building2 } from 'lucide-react';
+import {
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Building2,
+  AlertCircle,
+  ShieldCheck,
+} from 'lucide-react';
 import { signUp } from '../../apis/auth/auth.service';
 
 const SignupPage: React.FC = () => {
@@ -17,7 +27,7 @@ const SignupPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!fullName || !email || !password) {
+    if (!fullName.trim() || !email.trim() || !password) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -29,11 +39,15 @@ const SignupPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await signUp(fullName, email, password);
+      await signUp(fullName.trim(), email.trim(), password);
       localStorage.setItem('isVerified', 'false');
-      navigate('/verify-email', { state: { email } });
+      navigate('/verify-email', { state: { email: email.trim() } });
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Registration failed. Please try again.';
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Registration failed. Please try again.';
+
       setError(msg);
     } finally {
       setLoading(false);
@@ -41,132 +55,163 @@ const SignupPage: React.FC = () => {
   };
 
   return (
-    <div
-      className="min-h-screen w-full bg-slate-950 text-slate-100 flex items-center justify-center relative overflow-hidden"
-      style={{
-        background: 'radial-gradient(circle at 50% 0%, rgba(99,102,241,0.22) 0%, rgba(15,23,42,0.98) 65%, #020617 100%)',
-        padding: '1.25rem'
-      }}
-    >
-      {/* Background Decorative Glow */}
-      <div className="absolute top-[-10%] left-[25%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-indigo-600/10 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[25%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-violet-600/10 rounded-full blur-[130px] pointer-events-none" />
-
-      {/* Main Auth Card Container */}
-      <div
-        className="w-full max-w-md bg-slate-900/90 backdrop-blur-2xl border border-indigo-500/20 rounded-3xl shadow-2xl shadow-slate-950 flex flex-col gap-6 z-20 my-auto"
-        style={{ padding: '2.25rem 2rem' }}
-      >
-        {/* Card Header & Icon */}
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mb-3 shadow-inner p-3">
-            <Building2 className="w-6 h-6 text-indigo-400" />
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex items-center justify-center px-4 py-8 sm:px-6">
+      <div className="w-full max-w-md space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex w-12 h-12 rounded-2xl bg-indigo-600 text-white items-center justify-center shadow-md shadow-indigo-600/20 mb-1">
+            <Building2 size={24} strokeWidth={2.2} />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Create an Account</h2>
-          <p className="text-slate-400 text-xs sm:text-sm mt-1.5 leading-relaxed">
-            Sign up to get started with your school management portal.
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Create Admin Account
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
+            Register your institution and start managing academic and administrative operations.
           </p>
         </div>
 
-        {/* Error Alert */}
-        {error && (
-          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs sm:text-sm flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 animate-pulse" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-
-          {/* Name Field */}
-          <div className="flex flex-col gap-2">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Full Name
-            </label>
-            <div className="relative flex items-center">
-              <User className="w-4 h-4 sm:w-5 sm:h-5 absolute left-4 text-slate-400 pointer-events-none z-10" />
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Dr. Sarah Mitchell"
-                required
-                style={{ paddingLeft: '3rem', paddingRight: '1rem', paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
-                className="w-full bg-slate-950/90 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 outline-none transition-all"
-              />
+        {/* Signup Card */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-900/5 space-y-6">
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm animate-in fade-in"
+            >
+              <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-600" />
+              <span className="leading-snug">{error}</span>
             </div>
-          </div>
+          )}
 
-          {/* Email Field */}
-          <div className="flex flex-col gap-2">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Email Address
-            </label>
-            <div className="relative flex items-center">
-              <Mail className="w-4 h-4 sm:w-5 sm:h-5 absolute left-4 text-slate-400 pointer-events-none z-10" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
-                required
-                style={{ paddingLeft: '3rem', paddingRight: '1rem', paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
-                className="w-full bg-slate-950/90 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Password Field */}
-          <div className="flex flex-col gap-2">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Password
-            </label>
-            <div className="relative flex items-center">
-              <Lock className="w-4 h-4 sm:w-5 sm:h-5 absolute left-4 text-slate-400 pointer-events-none z-10" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                style={{ paddingLeft: '3rem', paddingRight: '3rem', paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
-                className="w-full bg-slate-950/90 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 outline-none transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 text-slate-400 hover:text-slate-200 transition p-1.5 rounded-lg hover:bg-slate-800/60 z-10 cursor-pointer"
-                aria-label="Toggle Password Visibility"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Full Name */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="fullName"
+                className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+                Full Name
+              </label>
+              <div className="relative">
+                <User
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  id="fullName"
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Dr. Sarah Mitchell"
+                  className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
             </div>
+
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="email"
+                className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+              >
+                Work Email Address
+              </label>
+              <div className="relative">
+                <Mail
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@school.edu"
+                  className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="password"
+                  className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                >
+                  Password
+                </label>
+                <span className="text-[11px] text-slate-400">Min. 6 characters</span>
+              </div>
+              <div className="relative">
+                <Lock
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a strong password"
+                  className="w-full h-11 pl-10 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer transition-colors"
+                  aria-label="Toggle Password Visibility"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Security Assurance */}
+            <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
+              <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+              <span>Institutional data is encrypted and ISO-compliant</span>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-sm shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition-all hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                <>
+                  <span>Create Account & Verify</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Login Redirect */}
+          <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
+            <span>Already registered as an administrator? </span>
+            <Link
+              to="/login"
+              className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
+            >
+              Sign In
+            </Link>
           </div>
+        </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ paddingTop: '0.9rem', paddingBottom: '0.9rem' }}
-            className="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.99] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-1"
-          >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                Sign Up <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Login Redirect Link */}
-        <p className="text-center text-xs sm:text-sm text-slate-400">
-          Already have an account?{' '}
-          <Link to="/login" className="text-indigo-400 font-semibold hover:text-indigo-300 transition">
-            Sign In
-          </Link>
+        {/* Security Trust Note */}
+        <p className="text-center text-xs text-slate-400">
+          School Management System &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>

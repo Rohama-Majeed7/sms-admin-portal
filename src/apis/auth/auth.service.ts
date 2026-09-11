@@ -6,16 +6,12 @@ export const signUp = async (fullName: string, email: string, password: string) 
         email: email,
         password: password,
     };
-    try {
-        const response = await api.post('/auth/signup', data);
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
+    const response = await api.post('/auth/signup', data);
+    return response.data;
 };
 
 export const login = async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post('/auth/login', { email, password,portal:'admin' });
     localStorage.setItem('accessToken', response.data.accessToken);
     localStorage.setItem('user', JSON.stringify(response.data.user));
     return response.data;

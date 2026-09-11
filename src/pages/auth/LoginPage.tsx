@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, KeyRound } from 'lucide-react';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Shield,
+  AlertCircle,
+} from 'lucide-react';
 import { login } from '../../apis/auth/auth.service';
 
 const LoginPage: React.FC = () => {
@@ -9,7 +17,6 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +47,12 @@ const LoginPage: React.FC = () => {
         'Invalid credentials. Please try again.';
 
       // Backend signals the account is not yet verified
-      const notVerifiedKeywords = ['not verified', 'verify your email', 'email not verified'];
+      const notVerifiedKeywords = [
+        'not verified',
+        'verify your email',
+        'email not verified',
+      ];
+
       if (notVerifiedKeywords.some((kw) => msg.toLowerCase().includes(kw))) {
         localStorage.setItem('isVerified', 'false');
         navigate('/verify-email', { state: { email } });
@@ -54,118 +66,149 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div
-      className="min-h-screen w-full bg-slate-950 text-slate-100 flex items-center justify-center relative overflow-hidden"
-      style={{
-        background: 'radial-gradient(circle at 50% 0%, rgba(99,102,241,0.22) 0%, rgba(15,23,42,0.98) 65%, #020617 100%)',
-        padding: '1.25rem'
-      }}
-    >
-      <div className="absolute top-[-10%] left-[25%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-indigo-600/10 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[25%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-violet-600/10 rounded-full blur-[130px] pointer-events-none" />
-
-      <div
-        className="w-full max-w-md sm:max-w-lg bg-slate-900/90 backdrop-blur-2xl border border-indigo-500/20 rounded-3xl shadow-2xl shadow-slate-950 flex flex-col gap-6 z-20 my-auto"
-        style={{ padding: '2.25rem 2rem' }}
-      >
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mb-3 shadow-inner p-3">
-            <KeyRound className="w-6 h-6 text-indigo-400" />
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex items-center justify-center px-4 py-8 sm:px-6">
+      <div className="w-full max-w-md space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex w-12 h-12 rounded-2xl bg-indigo-600 text-white items-center justify-center shadow-md shadow-indigo-600/20 mb-1">
+            <Shield size={24} strokeWidth={2.2} />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Welcome Back</h2>
-          <p className="text-slate-400 text-xs sm:text-sm mt-1.5 leading-relaxed">
-            Sign in to manage institution operations, students, and staff.
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Sign in to SMS Portal
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
+            Access school operations, institutional records, and administrative controls.
           </p>
         </div>
 
-        {error && (
-          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs sm:text-sm flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 animate-pulse" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Work Email Address
-            </label>
-            <div className="relative flex items-center">
-              <Mail className="w-4 h-4 sm:w-5 sm:h-5 absolute left-4 text-slate-400 pointer-events-none z-10" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@school.edu"
-                required
-                style={{ paddingLeft: '3rem', paddingRight: '1rem', paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
-                className="w-full bg-slate-950/90 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 outline-none transition-all"
-              />
+        {/* Login Card */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-900/5 space-y-6">
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm animate-in fade-in"
+            >
+              <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-600" />
+              <span className="leading-snug">{error}</span>
             </div>
-          </div>
+          )}
 
-          <div className="flex flex-col gap-2">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Password
-            </label>
-            <div className="relative flex items-center">
-              <Lock className="w-4 h-4 sm:w-5 sm:h-5 absolute left-4 text-slate-400 pointer-events-none z-10" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                style={{ paddingLeft: '3rem', paddingRight: '3rem', paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
-                className="w-full bg-slate-950/90 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 outline-none transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 text-slate-400 hover:text-slate-200 transition p-1.5 rounded-lg hover:bg-slate-800/60 z-10 cursor-pointer"
-                aria-label="Toggle Password Visibility"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="email"
+                className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+                Work Email Address
+              </label>
+              <div className="relative">
+                <Mail
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@school.edu"
+                  className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1.5">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-400 hover:text-slate-300 transition">
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="password"
+                  className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                >
+                  Password
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your account password"
+                  className="w-full h-11 pl-10 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer transition-colors"
+                  aria-label="Toggle Password Visibility"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center pt-0.5">
+              <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer"
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
                 />
-                <span>Remember me</span>
+                <span>Remember this device for 30 days</span>
               </label>
-              <Link
-                to="/forgot-password"
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition"
-              >
-                Forgot password?
-              </Link>
             </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-sm shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition-all hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In to Portal</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Registration Redirect */}
+          <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
+            <span>New institution or need an account? </span>
+            <Link
+              to="/signup"
+              className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
+            >
+              Create Administrator Account
+            </Link>
           </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ paddingTop: '0.9rem', paddingBottom: '0.9rem' }}
-            className="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.99] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
-          >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>Sign In to Portal <ArrowRight className="w-4 h-4" /></>
-            )}
-          </button>
-        </form>
-
-        <p className="text-center text-xs sm:text-sm text-slate-400 pt-2 border-t border-slate-800/60">
-          Need to register a new school?{' '}
-          <Link to="/signup" className="text-indigo-400 font-semibold hover:text-indigo-300 transition">
-            Create Admin Account
-          </Link>
+        {/* Security Trust Note */}
+        <p className="text-center text-xs text-slate-400">
+          Secure, encrypted School Management System &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>

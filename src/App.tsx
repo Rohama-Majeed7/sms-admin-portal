@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import type { ReactElement } from 'react'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import Dashboard from './pages/Dashboard'
+import AdminLayout from './layouts/AdminLayout'
+import DashboardPage from './pages/dashboard/DashboardPage'
+import SchoolsPage from './pages/schools/SchoolsPage'
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
 import VerifyEmailPage from './pages/auth/VerifyEmailPage'
@@ -13,7 +14,7 @@ const isAuthenticated = () => !!localStorage.getItem('accessToken');
 const PrivateRoute = ({ element }: { element: ReactElement }) =>
   isAuthenticated() ? element : <Navigate to="/login" replace />;
 
-/** Redirects to /dashboard if a token already exists (avoid login page when already in) */
+/** Redirects to /dashboard if a token already exists */
 const PublicRoute = ({ element }: { element: ReactElement }) =>
   isAuthenticated() ? <Navigate to="/dashboard" replace /> : element;
 
@@ -24,20 +25,46 @@ const App = () => {
         {/* Root: redirect to dashboard or login */}
         <Route path="/" element={<Navigate to={isAuthenticated() ? '/dashboard' : '/login'} replace />} />
 
-        {/* Protected routes */}
-        <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
-        <Route path="/admin/*" element={<PrivateRoute element={<AdminDashboard />} />} />
+        {/* Protected dashboard routes — all under /dashboard */}
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute
+              element={
+                <AdminLayout pageTitle="Dashboard" activePath="/dashboard">
+                  <DashboardPage />
+                </AdminLayout>
+              }
+            />
+          }
+        />
+        <Route
+          path="/dashboard/schools"
+          element={
+            <PrivateRoute
+              element={
+                <AdminLayout pageTitle="Schools" activePath="/dashboard/schools">
+                  <SchoolsPage />
+                </AdminLayout>
+              }
+            />
+          }
+        />
 
-        {/* Public-only routes (bounce to dashboard if already logged in) */}
-        <Route path="/login" element={<PublicRoute element={<LoginPage />} />} />
-        <Route path="/signup" element={<PublicRoute element={<SignupPage />} />} />
+        {/* Public-only routes */}
+        <Route path="/login"           element={<PublicRoute element={<LoginPage />} />} />
+        <Route path="/signup"          element={<PublicRoute element={<SignupPage />} />} />
         <Route path="/forgot-password" element={<PublicRoute element={<ForgotPasswordPage />} />} />
 
         {/* Verify email — accessible regardless of auth state */}
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to={isAuthenticated() ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </BrowserRouter>
   )
 }
 
 export default App
+

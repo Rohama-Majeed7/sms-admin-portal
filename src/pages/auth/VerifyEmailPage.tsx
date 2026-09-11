@@ -1,11 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { MailCheck, ArrowRight, ArrowLeft, CheckCircle2, RotateCw } from 'lucide-react';
+import {
+  MailCheck,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  RotateCw,
+  AlertCircle,
+} from 'lucide-react';
 import { sendOtp, verifyOtp } from '../../apis/auth/auth.service';
 
 const VerifyEmailPage: React.FC = () => {
   const location = useLocation();
-  const emailFromState = (location.state as { email?: string })?.email || '';
+  const emailFromState =
+    (location.state as { email?: string })?.email || '';
 
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -17,16 +25,16 @@ const VerifyEmailPage: React.FC = () => {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
 
-  // Auto-send OTP when page loads (email verification after signup)
+  // Auto-send OTP when page loads if email is passed
   useEffect(() => {
     if (emailFromState) {
       sendOtp(emailFromState).catch(() => {
-        // OTP may have already been sent by signup — ignore
+        // OTP may have already been dispatched by signup — ignore
       });
     }
-  }, []);
+  }, [emailFromState]);
 
-  // Timer countdown for Resend Code
+  // Timer countdown
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
@@ -44,13 +52,16 @@ const VerifyEmailPage: React.FC = () => {
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
 
-    // Auto-focus next input box
+    // Auto-advance
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -59,24 +70,29 @@ const VerifyEmailPage: React.FC = () => {
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').trim();
+
     if (/^\d{6}$/.test(pastedData)) {
-      const newOtp = pastedData.split('');
-      setOtp(newOtp);
+      setOtp(pastedData.split(''));
       inputRefs.current[5]?.focus();
     }
   };
 
   const handleResendCode = async () => {
     if (resendTimer > 0 || resendLoading) return;
+
     setError('');
     setResendLoading(true);
+
     try {
       await sendOtp(emailFromState);
       setResendTimer(120);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to resend code. Please try again.');
+      setError(
+        err?.response?.data?.message ||
+          'Failed to resend verification code. Please try again.',
+      );
     } finally {
       setResendLoading(false);
     }
@@ -93,129 +109,159 @@ const VerifyEmailPage: React.FC = () => {
     }
 
     setLoading(true);
+
     try {
       await verifyOtp(emailFromState, code);
-      // Mark email as verified
+
+      // Mark email as verified locally
       localStorage.setItem('isVerified', 'true');
       setSuccess(true);
+
       setTimeout(() => {
         navigate('/login');
       }, 1500);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Invalid or expired code. Please try again.');
+      setError(
+        err?.response?.data?.message ||
+          'Invalid or expired code. Please request a new one.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div 
-      className="min-h-screen w-full bg-slate-950 text-slate-100 flex items-center justify-center relative overflow-hidden" 
-      style={{ 
-        background: 'radial-gradient(circle at 50% 0%, rgba(99,102,241,0.22) 0%, rgba(15,23,42,0.98) 65%, #020617 100%)',
-        padding: '1.25rem'
-      }}
-    >
-      {/* Background Decorative Glow */}
-      <div className="absolute top-[-10%] left-[25%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-indigo-600/10 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[25%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-violet-600/10 rounded-full blur-[130px] pointer-events-none" />
-
-      {/* Main Auth Card Container */}
-      <div 
-        className="w-full max-w-md sm:max-w-lg bg-slate-900/90 backdrop-blur-2xl border border-indigo-500/20 rounded-3xl shadow-2xl shadow-slate-950 flex flex-col gap-6 z-20 my-auto"
-        style={{ padding: '2.25rem 2rem' }}
-      >
-        {/* Card Header & Icon */}
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mb-3 shadow-inner p-3">
-            <MailCheck className="w-6 h-6 text-indigo-400" />
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex items-center justify-center px-4 py-8 sm:px-6">
+      <div className="w-full max-w-md space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex w-12 h-12 rounded-2xl bg-indigo-600 text-white items-center justify-center shadow-md shadow-indigo-600/20 mb-1">
+            <MailCheck size={24} strokeWidth={2.2} />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Verify Email</h2>
-          <p className="text-slate-400 text-xs sm:text-sm mt-1.5 leading-relaxed">
-            We sent a 6-digit verification code to{' '}
-            <span className="text-indigo-300 font-semibold">{emailFromState || 'your email'}</span>.
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Verify Your Email
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
+            {emailFromState ? (
+              <>
+                A 6-digit code has been sent to{' '}
+                <strong className="text-slate-800 font-semibold">{emailFromState}</strong>
+              </>
+            ) : (
+              'Enter the 6-digit verification code sent to your registered email.'
+            )}
           </p>
         </div>
 
-        {/* Success Alert */}
-        {success && (
-          <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs sm:text-sm flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-            <span>Email verified successfully! Redirecting to login...</span>
-          </div>
-        )}
+        {/* Card */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-900/5 space-y-6">
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm animate-in fade-in"
+            >
+              <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-600" />
+              <span className="leading-snug">{error}</span>
+            </div>
+          )}
 
-        {/* Error Alert */}
-        {error && (
-          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs sm:text-sm flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 animate-pulse" />
-            <span>{error}</span>
-          </div>
-        )}
+          {success ? (
+            <div className="text-center py-6 space-y-3 animate-in fade-in">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
+                <CheckCircle2 size={26} />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900">Email Verified Successfully!</h2>
+              <p className="text-xs text-slate-500">
+                Your institutional account is now verified. Redirecting you to sign in...
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 6-Digit OTP Inputs */}
+              <div className="space-y-2 text-center">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Security Code
+                </label>
+                <div
+                  className="flex justify-center gap-2 sm:gap-2.5 pt-1"
+                  onPaste={handlePaste}
+                >
+                  {otp.map((digit, i) => (
+                    <input
+                      key={i}
+                      ref={(el) => {
+                        inputRefs.current[i] = el;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleChange(i, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(i, e)}
+                      className="w-11 h-12 text-center text-lg font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                    />
+                  ))}
+                </div>
+              </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+              {/* Resend and Timer Bar */}
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                <span>
+                  Code expires in:{' '}
+                  <strong className="text-slate-700 font-semibold">
+                    {formatTimer(resendTimer)}
+                  </strong>
+                </span>
+                <button
+                  type="button"
+                  disabled={resendTimer > 0 || resendLoading}
+                  onClick={handleResendCode}
+                  className="text-indigo-600 hover:text-indigo-700 font-semibold disabled:text-slate-300 disabled:cursor-not-allowed inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCw
+                    size={12}
+                    className={resendLoading ? 'animate-spin' : ''}
+                  />
+                  <span>Resend Code</span>
+                </button>
+              </div>
 
-          {/* 6 OTP Input Digit Boxes */}
-          <div className="flex items-center justify-center gap-2 sm:gap-3">
-            {otp.map((digit, index) => (
-              <input
-                key={index}
-                ref={(el) => { inputRefs.current[index] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleChange(index, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(index, e)}
-                onPaste={handlePaste}
-                style={{ width: '2.75rem', height: '3.25rem' }}
-                className="bg-slate-950/90 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-center text-lg font-bold text-slate-100 outline-none transition-all shadow-inner"
-              />
-            ))}
-          </div>
-
-          {/* Resend Code Section */}
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Didn't receive the code?</span>
-            {resendTimer > 0 ? (
-              <span className="text-slate-500 font-mono">Resend in {formatTimer(resendTimer)}</span>
-            ) : (
+              {/* Verify Button */}
               <button
-                type="button"
-                onClick={handleResendCode}
-                disabled={resendLoading}
-                className="text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-sm shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition-all hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <RotateCw className={`w-3.5 h-3.5 ${resendLoading ? 'animate-spin' : ''}`} />
-                {resendLoading ? 'Sending...' : 'Resend Code'}
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    <span>Verifying Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Confirm & Continue</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
               </button>
-            )}
+            </form>
+          )}
+
+          {/* Back to Login */}
+          <div className="pt-4 border-t border-slate-100 text-center">
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Sign In</span>
+            </Link>
           </div>
+        </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading || success}
-            style={{ paddingTop: '0.9rem', paddingBottom: '0.9rem' }}
-            className="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.99] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-1"
-          >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                Verify & Proceed <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Redirect Link */}
-        <p className="text-center text-xs sm:text-sm text-slate-400 pt-2 border-t border-slate-800/60 flex items-center justify-center gap-1.5">
-          <ArrowLeft className="w-4 h-4 text-slate-400" />
-          <Link to="/login" className="text-indigo-400 font-semibold hover:text-indigo-300 transition">
-            Back to Sign In
-          </Link>
+        {/* Security Trust Note */}
+        <p className="text-center text-xs text-slate-400">
+          School Management System &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>
