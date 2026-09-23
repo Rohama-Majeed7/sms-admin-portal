@@ -1,70 +1,178 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import type { ReactElement } from 'react'
-import AdminLayout from './layouts/AdminLayout'
-import DashboardPage from './pages/dashboard/DashboardPage'
-import SchoolsPage from './pages/schools/SchoolsPage'
-import LoginPage from './pages/auth/LoginPage'
-import SignupPage from './pages/auth/SignupPage'
-import VerifyEmailPage from './pages/auth/VerifyEmailPage'
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import type { ReactElement } from "react";
+import AdminLayout from "./layouts/AdminLayout";
+import DashboardPage from "./pages/dashboard/DashboardPage";
+import SchoolOnboardingPage from "./pages/onboarding/SchoolOnboardingPage";
+import SchoolSettingsPage from "./pages/settings/SchoolSettingsPage";
+import LoginPage from "./pages/auth/LoginPage";
+import SignupPage from "./pages/auth/SignupPage";
+import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import { ToastContainer } from "react-toastify";
 
-const isAuthenticated = () => !!localStorage.getItem('accessToken');
+const isAuthenticated = () => !!localStorage.getItem("accessToken");
 
-/** Redirects to /login if no token exists */
-const PrivateRoute = ({ element }: { element: ReactElement }) =>
-  isAuthenticated() ? element : <Navigate to="/login" replace />;
+/**
+ * Route guard for routes requiring an authenticated admin with an ACTIVE school.
+ * If not authenticated -> redirect to /login.
+ * If authenticated without active school -> redirect to /onboarding.
+ */
+const hasActiveSchool = () => {
+  const user = localStorage.getItem("user");
+  const schoolStatus = user ? JSON.parse(user).schoolAdmin?.status : null;
+  if (schoolStatus === "PENDING") {
+    return false;
+  }
+  if (schoolStatus === "INACTIVE") {
+    return false;
+  }
+  return schoolStatus;
+};
 
-/** Redirects to /dashboard if a token already exists */
-const PublicRoute = ({ element }: { element: ReactElement }) =>
-  isAuthenticated() ? <Navigate to="/dashboard" replace /> : element;
+const ActiveSchoolRoute = ({ element }: { element: ReactElement }) => {
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!hasActiveSchool()) {
+    return <Navigate to="/onboarding" replace />;
+  }
+  return element;
+};
+
+/**
+ * Route guard for onboarding screen.
+ * If not authenticated -> redirect to /login.
+ * If authenticated and already has an active school -> redirect to /dashboard.
+ */
+const OnboardingRoute = ({ element }: { element: ReactElement }) => {
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+  if (hasActiveSchool()) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return element;
+};
+
+/**
+ * Redirects authenticated users away from public auth pages.
+ * Routes to /dashboard if school is active, or /onboarding if not.
+ */
+const PublicRoute = ({ element }: { element: ReactElement }) => {
+  if (!isAuthenticated()) {
+    return element;
+  }
+  return (
+    <Navigate to={hasActiveSchool() ? "/dashboard" : "/onboarding"} replace />
+  );
+};
 
 const App = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Root: redirect to dashboard or login */}
-        <Route path="/" element={<Navigate to={isAuthenticated() ? '/dashboard' : '/login'} replace />} />
+    <>
+      <ToastContainer />
+      <BrowserRouter>
+        <Routes>
+          {/* Root: redirect based on auth and school status */}
+          <Route
+            path="/"
+            element={
+              <Navigate
+                to={
+                  isAuthenticated()
+                    ? hasActiveSchool()
+                      ? "/dashboard"
+                      : "/onboarding"
+                    : "/login"
+                }
+                replace
+              />
+            }
+          />
 
-        {/* Protected dashboard routes — all under /dashboard */}
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute
-              element={
-                <AdminLayout pageTitle="Dashboard" activePath="/dashboard">
-                  <DashboardPage />
-                </AdminLayout>
-              }
-            />
-          }
-        />
-        <Route
-          path="/dashboard/schools"
-          element={
-            <PrivateRoute
-              element={
-                <AdminLayout pageTitle="Schools" activePath="/dashboard/schools">
-                  <SchoolsPage />
-                </AdminLayout>
-              }
-            />
-          }
-        />
+          {/* School Onboarding Screen */}
+          <Route
+            path="/onboarding"
+            element={<OnboardingRoute element={<SchoolOnboardingPage />} />}
+          />
 
-        {/* Public-only routes */}
-        <Route path="/login"           element={<PublicRoute element={<LoginPage />} />} />
-        <Route path="/signup"          element={<PublicRoute element={<SignupPage />} />} />
-        <Route path="/forgot-password" element={<PublicRoute element={<ForgotPasswordPage />} />} />
+          {/* Protected dashboard route — requires active school */}
+          <Route
+            path="/dashboard"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Dashboard" activePath="/dashboard">
+                    <DashboardPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
 
-        {/* Verify email — accessible regardless of auth state */}
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
+          {/* Protected School Settings route — requires active school */}
+          <Route
+            path="/settings"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="School Settings" activePath="/settings">
+                    <SchoolSettingsPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to={isAuthenticated() ? '/dashboard' : '/login'} replace />} />
-      </Routes>
-    </BrowserRouter>
-  )
-}
+          {/* Redirect /dashboard/settings to /settings */}
+          <Route
+            path="/dashboard/settings"
+            element={<Navigate to="/settings" replace />}
+          />
 
-export default App
+          {/* Redirect /dashboard/schools to /dashboard (multi-school management removed) */}
+          <Route
+            path="/dashboard/schools"
+            element={<Navigate to="/dashboard" replace />}
+          />
 
+          {/* Public-only routes */}
+          <Route
+            path="/login"
+            element={<PublicRoute element={<LoginPage />} />}
+          />
+          <Route
+            path="/signup"
+            element={<PublicRoute element={<SignupPage />} />}
+          />
+          <Route
+            path="/forgot-password"
+            element={<PublicRoute element={<ForgotPasswordPage />} />}
+          />
+
+          {/* Verify email — accessible regardless of auth state */}
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+
+          {/* Fallback */}
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to={
+                  isAuthenticated()
+                    ? hasActiveSchool()
+                      ? "/dashboard"
+                      : "/onboarding"
+                    : "/login"
+                }
+                replace
+              />
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </>
+  );
+};
+
+export default App;

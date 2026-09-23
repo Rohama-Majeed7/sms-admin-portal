@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Building2,
   AlertCircle,
-  ShieldCheck,
 } from 'lucide-react';
 import { signUp } from '../../apis/auth/auth.service';
 
@@ -65,9 +64,7 @@ const SignupPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Create Admin Account
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
-            Register your institution and start managing academic and administrative operations.
-          </p>
+          
         </div>
 
         {/* Signup Card */}
@@ -171,11 +168,7 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Security Assurance */}
-            <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
-              <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
-              <span>Institutional data is encrypted and ISO-compliant</span>
-            </div>
+            
 
             {/* Submit Button */}
             <button
@@ -199,7 +192,7 @@ const SignupPage: React.FC = () => {
 
           {/* Login Redirect */}
           <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
-            <span>Already registered as an administrator? </span>
+            <span>Already have an account? </span>
             <Link
               to="/login"
               className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"

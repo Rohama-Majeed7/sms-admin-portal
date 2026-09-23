@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Mail,
@@ -18,6 +18,18 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+const hasActiveSchool = () => {
+    const user = localStorage.getItem('user');
+    const schoolStatus = user ? JSON.parse(user).schoolAdmin?.status : null;
+    if (schoolStatus === 'PENDING') {
+      return false;
+    }
+    if (schoolStatus === 'INACTIVE') {
+      return false;
+    }
+    return schoolStatus;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +51,11 @@ const LoginPage: React.FC = () => {
       setLoading(true);
       const res = await login(email, password);
       localStorage.setItem('isVerified', JSON.stringify(res?.user?.isVerified));
-      navigate('/dashboard');
+      if (hasActiveSchool()) {
+        navigate('/dashboard');
+      } else {
+        navigate('/onboarding');
+      }
     } catch (err: any) {
       const msg: string =
         err?.response?.data?.message ||
@@ -76,9 +92,7 @@ const LoginPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Sign in to SMS Portal
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
-            Access school operations, institutional records, and administrative controls.
-          </p>
+          
         </div>
 
         {/* Login Card */}
@@ -129,12 +143,7 @@ const LoginPage: React.FC = () => {
                 >
                   Password
                 </label>
-                <Link
-                  to="/forgot-password"
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
-                >
-                  Forgot password?
-                </Link>
+                
               </div>
               <div className="relative">
                 <Lock
@@ -163,15 +172,21 @@ const LoginPage: React.FC = () => {
             </div>
 
             {/* Remember Me */}
-            <div className="flex items-center pt-0.5">
+            <div className="flex justify-between pt-0.5">
               <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   defaultChecked
                   className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
                 />
-                <span>Remember this device for 30 days</span>
+                <span>Remember me</span>
               </label>
+              <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+                >
+                  Forgot password?
+                </Link>
             </div>
 
             {/* Submit Button */}
@@ -196,7 +211,7 @@ const LoginPage: React.FC = () => {
 
           {/* Registration Redirect */}
           <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
-            <span>New institution or need an account? </span>
+            <span>Don't have an account? </span>
             <Link
               to="/signup"
               className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"

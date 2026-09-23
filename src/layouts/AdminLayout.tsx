@@ -1,30 +1,28 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  Building2,
   Menu,
   X,
   LogOut,
   Shield,
-  Search,
   ChevronDown,
   ChevronRight,
-} from 'lucide-react';
-import { logout } from '../apis/auth/auth.service';
+  Settings,
+} from "lucide-react";
+import { logout } from "../apis/auth/auth.service";
+import { getStoredSchool, SCHOOL_UPDATE_EVENT } from "../services/schoolStorage";
 
 const navItems = [
   {
-    label: 'Dashboard',
-    path: '/dashboard',
+    label: "Dashboard",
+    path: "/dashboard",
     icon: LayoutDashboard,
-    description: 'System overview & metrics',
   },
   {
-    label: 'Schools',
-    path: '/dashboard/schools',
-    icon: Building2,
-    description: 'Manage registered institutions',
+    label: "Settings",
+    path: "/settings",
+    icon: Settings,
   },
 ];
 
@@ -36,7 +34,7 @@ interface AdminLayoutProps {
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({
   children,
-  pageTitle = 'Dashboard',
+  pageTitle = "Dashboard",
   activePath,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -47,23 +45,37 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
 
-  const user = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || 'null');
-    } catch {
-      return null;
-    }
-  })();
+  const [school, setSchool] = useState(getStoredSchool);
+  const user = localStorage.getItem("user")
+    ? JSON.parse(localStorage.getItem("user") || "null")
+    : null;
 
+  useEffect(() => {
+    const handleSchoolUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setSchool(customEvent.detail);
+      } else {
+        setSchool(getStoredSchool());
+      }
+    };
+    window.addEventListener(SCHOOL_UPDATE_EVENT, handleSchoolUpdate);
+    return () => {
+      window.removeEventListener(SCHOOL_UPDATE_EVENT, handleSchoolUpdate);
+    };
+  }, []);
   // Close profile dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(e.target as Node)
+      ) {
         setProfileOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Close mobile drawer on route change
@@ -79,9 +91,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
     } catch {
       /* ignore API errors, always clean up locally */
     } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
-      navigate('/login');
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+      navigate("/login");
     }
   };
 
@@ -90,7 +102,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
       {/* Brand Header */}
       <div
         className={`flex items-center h-16 px-4 border-b border-slate-100 ${
-          collapsed && !isMobile ? 'justify-center' : 'justify-between'
+          collapsed && !isMobile ? "justify-center" : "justify-between"
         }`}
       >
         <Link
@@ -106,12 +118,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 <span className="text-slate-900 font-bold text-[15px] tracking-tight truncate">
                   SMS Admin
                 </span>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                  PRO
-                </span>
               </div>
-              <p className="text-slate-400 text-xs font-medium truncate">
-                School Management
+              <p
+                className="text-slate-500 text-xs font-medium truncate"
+                title={school?.name || "School Management"}
+              >
+                {school?.name || "School Management"}
               </p>
             </div>
           )}
@@ -138,7 +150,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
         )}
 
         <nav className="space-y-1">
-          {navItems.map(({ label, path, icon: Icon, description }) => {
+          {navItems.map(({ label, path, icon: Icon }) => {
             const current = activePath || location.pathname;
             const active = current === path;
 
@@ -148,9 +160,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 to={path}
                 className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
                   active
-                    ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                } ${collapsed && !isMobile ? 'justify-center px-2' : ''}`}
+                    ? "bg-indigo-50 text-indigo-700 font-semibold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                } ${collapsed && !isMobile ? "justify-center px-2" : ""}`}
               >
                 {active && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-600 rounded-r-full" />
@@ -160,22 +172,22 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                   size={19}
                   className={`shrink-0 transition-colors ${
                     active
-                      ? 'text-indigo-600'
-                      : 'text-slate-400 group-hover:text-slate-600'
+                      ? "text-indigo-600"
+                      : "text-slate-400 group-hover:text-slate-600"
                   }`}
                 />
 
                 {(!collapsed || isMobile) && (
                   <div className="flex-1 min-w-0">
                     <p className="leading-none truncate">{label}</p>
-                    <p className="text-[11px] text-slate-400 font-normal truncate mt-1">
-                      {description}
-                    </p>
                   </div>
                 )}
 
                 {(!collapsed || isMobile) && active && (
-                  <ChevronRight size={14} className="text-indigo-400 shrink-0" />
+                  <ChevronRight
+                    size={14}
+                    className="text-indigo-400 shrink-0"
+                  />
                 )}
 
                 {/* Collapsed Tooltip */}
@@ -191,45 +203,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
       </div>
 
       {/* Footer / User Profile */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50/50">
-        <div
-          className={`flex items-center gap-3 p-2 rounded-xl bg-white border border-slate-200/80 shadow-xs ${
-            collapsed && !isMobile ? 'justify-center p-1.5' : ''
-          }`}
-        >
-          <img
-            src={
-              user?.avatar ||
-              'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'
-            }
-            alt="Admin avatar"
-            className="w-8 h-8 rounded-lg bg-indigo-50 border border-slate-200 object-cover shrink-0"
-          />
-
-          {(!collapsed || isMobile) && (
-            <>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-800 truncate">
-                  {user?.name || 'Administrator'}
-                </p>
-                <p className="text-[11px] text-slate-400 truncate">
-                  {user?.email || 'admin@school.edu'}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
-                title="Sign Out"
-                aria-label="Sign Out"
-              >
-                <LogOut size={15} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
     </div>
   );
 
@@ -246,7 +219,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
       {/* Mobile Off-canvas Drawer */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white shadow-2xl transition-transform duration-200 ease-out lg:hidden ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <SidebarContent isMobile />
@@ -255,12 +228,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
       {/* Desktop Sticky Sidebar */}
       <aside
         className={`hidden lg:block shrink-0 transition-all duration-200 ease-out ${
-          collapsed ? 'w-20' : 'w-64'
+          collapsed ? "w-20" : "w-64"
         }`}
       >
         <div
           className={`fixed inset-y-0 left-0 z-30 transition-all duration-200 ease-out ${
-            collapsed ? 'w-20' : 'w-64'
+            collapsed ? "w-20" : "w-64"
           }`}
         >
           <SidebarContent />
@@ -292,32 +265,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
               <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
                 <span>Portal</span>
                 <ChevronRight size={12} />
-                <span className="text-slate-600 font-semibold">{pageTitle}</span>
+                <span className="text-slate-600 font-semibold">
+                  {pageTitle}
+                </span>
               </div>
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate leading-tight">
+              {/* <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate leading-tight">
                 {pageTitle}
-              </h1>
+              </h1> */}
             </div>
           </div>
 
           {/* Header Right: Search, Notifications, User Menu */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick Search */}
-            <div className="hidden md:flex items-center gap-2 bg-slate-100/80 hover:bg-slate-100 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/40 border border-slate-200/80 rounded-xl px-3 py-1.5 transition-all text-xs">
-              <Search size={14} className="text-slate-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Search schools, records..."
-                className="bg-transparent text-slate-800 placeholder-slate-400 outline-none w-40 lg:w-52 text-xs"
-              />
-              <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded-md shadow-2xs">
-                ⌘K
-              </kbd>
-            </div>
-
-            {/* Notifications */}
-            
-
             {/* User Dropdown */}
             <div className="relative" ref={profileRef}>
               <button
@@ -329,18 +288,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 <img
                   src={
                     user?.avatar ||
-                    'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'
+                    "https://api.dicebear.com/7.x/avataaars/svg?seed=admin"
                   }
                   alt="avatar"
                   className="w-7 h-7 rounded-lg bg-indigo-50 border border-slate-200 object-cover"
                 />
                 <span className="text-xs font-semibold text-slate-800 hidden sm:inline truncate max-w-[110px]">
-                  {user?.name?.split(' ')[0] || 'Admin'}
+                  {user?.name?.split(" ")[0] || "Admin"}
                 </span>
                 <ChevronDown
                   size={13}
                   className={`text-slate-400 transition-transform ${
-                    profileOpen ? 'rotate-180' : ''
+                    profileOpen ? "rotate-180" : ""
                   }`}
                 />
               </button>
@@ -349,18 +308,26 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden z-50">
                   <div className="p-3.5 border-b border-slate-100 bg-slate-50/50">
                     <p className="text-xs font-semibold text-slate-900 truncate">
-                      {user?.name || 'Super Admin'}
+                      {user?.name || "Super Admin"}
                     </p>
                     <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                      {user?.email || 'admin@school.edu'}
+                      {user?.email || "admin@school.edu"}
                     </p>
-                    <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Active Administrator
-                    </div>
+                    
                   </div>
 
-                  <div className="p-1.5">
+                  <div className="p-1.5 space-y-0.5">
+                    <Link
+                      to="/settings"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-colors cursor-pointer"
+                    >
+                      <Settings size={14} className="text-slate-400" />
+                      <span>Settings</span>
+                    </Link>
+
+                    <div className="h-px bg-slate-100 my-1" />
+
                     <button
                       type="button"
                       onClick={handleLogout}
