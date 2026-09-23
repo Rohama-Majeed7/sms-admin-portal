@@ -20,7 +20,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
 const hasActiveSchool = () => {
-    const user = localStorage.getItem('user');
+    const user = localStorage.getItem('user') || undefined;
     const schoolStatus = user ? JSON.parse(user).schoolAdmin?.status : null;
     if (schoolStatus === 'PENDING') {
       return false;
@@ -50,7 +50,8 @@ const hasActiveSchool = () => {
     try {
       setLoading(true);
       const res = await login(email, password);
-      localStorage.setItem('isVerified', JSON.stringify(res?.user?.isVerified));
+      localStorage.setItem('isVerified', JSON.stringify(res?.data?.isVerified));
+      localStorage.setItem('user', JSON.stringify(res?.data));
       if (hasActiveSchool()) {
         navigate('/dashboard');
       } else {
