@@ -25,6 +25,7 @@ export const logout = async (email: string) => {
     const response = await api.post('/auth/logout', { email });
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
+
     clearSchool();
     return response.data;
 };

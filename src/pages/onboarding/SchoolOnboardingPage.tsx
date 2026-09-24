@@ -136,6 +136,7 @@ const SchoolOnboardingPage: React.FC = () => {
       }
       const data = await createSchool(schoolData);
       if (data.success === true) {
+        localStorage.setItem("user", JSON.stringify({ ...user, schoolAdmin: data.data }));
         toast.success(data.message);
         setLoading(false);
         if (data.data.status === "ACTIVE") {
