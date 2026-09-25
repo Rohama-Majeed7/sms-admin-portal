@@ -1,62 +1,81 @@
-import axios from 'axios';
-import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import axios from "axios";
+import { logout } from "./auth/auth.service";
 
-const API_BASE_URL: string = import.meta.env.VITE_API_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-export const api: AxiosInstance = axios.create({
-    baseURL: `${API_BASE_URL}/api/`,
-    timeout: 15000,
-    headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-    },
-    withCredentials: true,
+const user = JSON.parse(localStorage.getItem("user") || "null");
+
+export const api = axios.create({
+  baseURL: `${API_BASE_URL}/api/`,
+  timeout: 15000,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
+  withCredentials: true,
 });
 
-// Request Interceptor: Attach Authorization Token & Log Requests
+// Request interceptor
 api.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
-        const token = localStorage.getItem('accessToken');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
+  (config) => {
+    const token = localStorage.getItem("accessToken");
 
-        if (import.meta.env.DEV) {
-            console.log(`[API Request] ${config.method?.toUpperCase()} -> ${config.url}`);
-        }
-
-        return config;
-    },
-    (error: AxiosError) => {
-        console.error('[API Request Error]', error);
-        return Promise.reject(error);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+
+    return config;
+  },
+  (error) => Promise.reject(error),
 );
 
-// Response Interceptor: Handle Global Errors & Log Responses
-api.interceptors.response.use(
-    (response: AxiosResponse) => {
-        if (import.meta.env.DEV) {
-            console.log(`[API Response] ${response.status} <- ${response.config.url}`);
-        }
-        return response;
-    },
-    (error: AxiosError) => {
-        if (error.response) {
-            const { status } = error.response;
-            if (status === 401) {
-                console.warn('[API Auth Error] Unauthorized - 401');
-            } else if (status === 403) {
-                console.warn('[API Auth Error] Forbidden - 403');
-            } else if (status >= 500) {
-                console.error('[API Server Error]', status);
-            }
-        } else if (error.request) {
-            console.error('[API Network Error] No response received');
-        }
+// Refresh token ke liye separate axios instance
+const refreshApi = axios.create({
+  baseURL: `${API_BASE_URL}/api/`,
+  withCredentials: true,
+});
 
-        return Promise.reject(error);
+// Response interceptor
+api.interceptors.response.use(
+  (response) => response,
+
+  async (error) => {
+    const originalRequest = error.config;
+
+    const errorMessage = error.response?.data?.message;
+
+    if (
+      error.response?.status === 401 &&
+      errorMessage === "Access token expired" &&
+      !originalRequest?._retry
+    ) {
+      originalRequest._retry = true;
+
+      try {
+        const response = await refreshApi.post("/auth/refresh-token");
+
+        const newAccessToken = response.data.data.accessToken;
+
+        localStorage.setItem("accessToken", newAccessToken);
+
+        originalRequest.headers.Authorization =
+          `Bearer ${newAccessToken}`;
+
+        return api(originalRequest);
+      } catch (refreshError) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
+
+        logout(user?.email);
+
+        window.location.href = "/login";
+
+        return Promise.reject(refreshError);
+      }
     }
+
+    return Promise.reject(error);
+  },
 );
 
 export default api;
