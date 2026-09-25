@@ -11,7 +11,10 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import { ToastContainer } from "react-toastify";
 
 const isAuthenticated = () => !!localStorage.getItem("accessToken");
-
+const isAdmin = () => {
+  const user = localStorage.getItem("user");
+  return user ? JSON.parse(user).role === "ADMIN" : false;
+};
 /**
  * Route guard for routes requiring an authenticated admin with an ACTIVE school.
  * If not authenticated -> redirect to /login.
@@ -33,6 +36,12 @@ const ActiveSchoolRoute = ({ element }: { element: ReactElement }) => {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
+  if (!isAdmin()) {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("user");
+    return <Navigate to="/login" replace />;
+  }
+
   if (!hasActiveSchool()) {
     return <Navigate to="/onboarding" replace />;
   }
@@ -46,6 +55,11 @@ const ActiveSchoolRoute = ({ element }: { element: ReactElement }) => {
  */
 const OnboardingRoute = ({ element }: { element: ReactElement }) => {
   if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!isAdmin()) {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("user");
     return <Navigate to="/login" replace />;
   }
   if (hasActiveSchool()) {
@@ -116,7 +130,10 @@ const App = () => {
             element={
               <ActiveSchoolRoute
                 element={
-                  <AdminLayout pageTitle="School Settings" activePath="/settings">
+                  <AdminLayout
+                    pageTitle="School Settings"
+                    activePath="/settings"
+                  >
                     <SchoolSettingsPage />
                   </AdminLayout>
                 }
