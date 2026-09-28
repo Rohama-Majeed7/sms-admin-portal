@@ -164,7 +164,6 @@ const SchoolSettingsPage: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to update school details:", err);
-      toast.error("An error occurred while saving school details.");
     } finally {
       setIsSaving(false);
     }

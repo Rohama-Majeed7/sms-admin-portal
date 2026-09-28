@@ -1,5 +1,4 @@
 import api from "../api";
-import { clearSchool, saveSchool } from "../../services/schoolStorage";
 
 export const signUp = async (fullName: string, email: string, password: string) => {
     const data = {
@@ -15,9 +14,7 @@ export const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password,portal:'admin' });
     localStorage.setItem('accessToken', response.data.accessToken);
     localStorage.setItem('user', JSON.stringify(response.data.user));
-    if (response.data.user?.school) {
-        saveSchool(response.data.user.school);
-    }
+    
     return response.data;
 };
 
@@ -26,7 +23,6 @@ export const logout = async (email: string) => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
 
-    clearSchool();
     return response.data;
 };
 

@@ -38,9 +38,13 @@ const SignupPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await signUp(fullName.trim(), email.trim(), password);
-      localStorage.setItem('isVerified', 'false');
-      navigate('/verify-email', { state: { email: email.trim() } });
+    const res =  await signUp(fullName.trim(), email.trim(), password);
+      if (res?.data?.isVerified === false) {
+        navigate('/verify-email', { state: { email: email.trim() } });
+      }
+      else{
+        navigate('/login');
+      }
     } catch (err: any) {
       const msg =
         err?.response?.data?.message ||

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Mail,
   Lock,
@@ -8,75 +8,66 @@ import {
   ArrowRight,
   Shield,
   AlertCircle,
-} from 'lucide-react';
-import { login } from '../../apis/auth/auth.service';
+} from "lucide-react";
+import { login } from "../../apis/auth/auth.service";
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
-const hasActiveSchool = () => {
-    const user = localStorage.getItem('user') || undefined;
+  const hasActiveSchool = () => {
+    const user = localStorage.getItem("user") || undefined;
     const schoolStatus = user ? JSON.parse(user).schoolAdmin?.status : null;
-    if (schoolStatus === 'PENDING') {
+    if (schoolStatus === "PENDING") {
       return false;
     }
-    if (schoolStatus === 'INACTIVE') {
+    if (schoolStatus === "INACTIVE") {
       return false;
     }
     return schoolStatus;
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!email || !password) {
-      setError('Please enter both email and password.');
+      setError("Please enter both email and password.");
       return;
     }
 
     // Guard: only allow login if email has been verified
-    const isVerified = localStorage.getItem('isVerified');
-    if (isVerified !== null && isVerified !== 'true') {
-      navigate('/verify-email', { state: { email } });
-      return;
-    }
+    // const isVerified = localStorage.getItem('isVerified');
+    // if (isVerified !== null && isVerified !== 'true') {
+    //   navigate('/verify-email', { state: { email } });
+    //   return;
+    // }
 
     try {
       setLoading(true);
       const res = await login(email, password);
-      localStorage.setItem('isVerified', JSON.stringify(res?.data?.isVerified));
-      localStorage.setItem('user', JSON.stringify(res?.data));
-      if (hasActiveSchool()) {
-        navigate('/dashboard');
-      } else {
-        navigate('/onboarding');
-      }
-    } catch (err: any) {
-      const msg: string =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Invalid credentials. Please try again.';
-
-      // Backend signals the account is not yet verified
-      const notVerifiedKeywords = [
-        'not verified',
-        'verify your email',
-        'email not verified',
-      ];
-
-      if (notVerifiedKeywords.some((kw) => msg.toLowerCase().includes(kw))) {
-        localStorage.setItem('isVerified', 'false');
-        navigate('/verify-email', { state: { email } });
+      // localStorage.setItem('isVerified', JSON.stringify(res?.data?.isVerified));
+      localStorage.setItem("user", JSON.stringify(res?.data));
+      if (res?.data?.isVerified === false) {
+        navigate("/verify-email", { state: { email } });
         return;
       }
-
-      setError(msg);
+      if (hasActiveSchool()) {
+        navigate("/dashboard");
+      } else {
+        navigate("/onboarding");
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message);
+      if (err?.response?.data?.message.includes("not verified")) {
+        setTimeout(() => {
+          navigate("/verify-email", { state: { email } });
+        }, 1000);
+      }
     } finally {
       setLoading(false);
     }
@@ -93,7 +84,6 @@ const hasActiveSchool = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Sign in to SMS Portal
           </h1>
-          
         </div>
 
         {/* Login Card */}
@@ -103,7 +93,10 @@ const hasActiveSchool = () => {
               role="alert"
               className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm animate-in fade-in"
             >
-              <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-600" />
+              <AlertCircle
+                size={16}
+                className="shrink-0 mt-0.5 text-rose-600"
+              />
               <span className="leading-snug">{error}</span>
             </div>
           )}
@@ -144,7 +137,6 @@ const hasActiveSchool = () => {
                 >
                   Password
                 </label>
-                
               </div>
               <div className="relative">
                 <Lock
@@ -153,7 +145,7 @@ const hasActiveSchool = () => {
                 />
                 <input
                   id="password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"
                   value={password}
@@ -183,11 +175,11 @@ const hasActiveSchool = () => {
                 <span>Remember me</span>
               </label>
               <Link
-                  to="/forgot-password"
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
-                >
-                  Forgot password?
-                </Link>
+                to="/forgot-password"
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+              >
+                Forgot password?
+              </Link>
             </div>
 
             {/* Submit Button */}
@@ -224,7 +216,8 @@ const hasActiveSchool = () => {
 
         {/* Security Trust Note */}
         <p className="text-center text-xs text-slate-400">
-          Secure, encrypted School Management System &copy; {new Date().getFullYear()}
+          Secure, encrypted School Management System &copy;{" "}
+          {new Date().getFullYear()}
         </p>
       </div>
     </div>

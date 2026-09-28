@@ -4,6 +4,8 @@ import AdminLayout from "./layouts/AdminLayout";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import SchoolOnboardingPage from "./pages/onboarding/SchoolOnboardingPage";
 import SchoolSettingsPage from "./pages/settings/SchoolSettingsPage";
+import TeachersPage from "./pages/teachers/TeachersPage";
+import StudentsPage from "./pages/students/StudentsPage";
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
@@ -124,6 +126,40 @@ const App = () => {
             }
           />
 
+          {/* Protected Teachers route — requires active school */}
+          <Route
+            path="/teachers"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout
+                    pageTitle="Teachers"
+                    activePath="/teachers"
+                  >
+                    <TeachersPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+
+          {/* Protected Students route — requires active school */}
+          <Route
+            path="/students"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout
+                    pageTitle="Students"
+                    activePath="/students"
+                  >
+                    <StudentsPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+
           {/* Protected School Settings route — requires active school */}
           <Route
             path="/settings"
@@ -139,6 +175,16 @@ const App = () => {
                 }
               />
             }
+          />
+
+          {/* Redirects for alternative paths */}
+          <Route
+            path="/dashboard/teachers"
+            element={<Navigate to="/teachers" replace />}
+          />
+          <Route
+            path="/dashboard/students"
+            element={<Navigate to="/students" replace />}
           />
 
           {/* Redirect /dashboard/settings to /settings */}

@@ -9,15 +9,26 @@ import {
   ChevronDown,
   ChevronRight,
   Settings,
+  Users,
+  GraduationCap,
 } from "lucide-react";
 import { logout } from "../apis/auth/auth.service";
-import { getStoredSchool, SCHOOL_UPDATE_EVENT } from "../services/schoolStorage";
 
 const navItems = [
   {
     label: "Dashboard",
     path: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Teachers",
+    path: "/teachers",
+    icon: Users,
+  },
+  {
+    label: "Students",
+    path: "/students",
+    icon: GraduationCap,
   },
   {
     label: "Settings",
@@ -45,25 +56,25 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [school, setSchool] = useState(getStoredSchool);
+  // const [school, setSchool] = useState(getStoredSchool);
   const user = localStorage.getItem("user")
     ? JSON.parse(localStorage.getItem("user") || "null")
     : null;
-
-  useEffect(() => {
-    const handleSchoolUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) {
-        setSchool(customEvent.detail);
-      } else {
-        setSchool(getStoredSchool());
-      }
-    };
-    window.addEventListener(SCHOOL_UPDATE_EVENT, handleSchoolUpdate);
-    return () => {
-      window.removeEventListener(SCHOOL_UPDATE_EVENT, handleSchoolUpdate);
-    };
-  }, []);
+const school = user?.school || null;
+  // useEffect(() => {
+  //   const handleSchoolUpdate = (e: Event) => {
+  //     const customEvent = e as CustomEvent;
+  //     if (customEvent.detail) {
+  //       setSchool(customEvent.detail);
+  //     } else {
+  //       setSchool(getStoredSchool());
+  //     }
+  //   };
+  //   window.addEventListener(SCHOOL_UPDATE_EVENT, handleSchoolUpdate);
+  //   return () => {
+  //     window.removeEventListener(SCHOOL_UPDATE_EVENT, handleSchoolUpdate);
+  //   };
+  // }, []);
   // Close profile dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

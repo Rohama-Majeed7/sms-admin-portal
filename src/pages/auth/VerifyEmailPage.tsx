@@ -1,5 +1,5 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+﻿import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   MailCheck,
   ArrowRight,
@@ -7,18 +7,17 @@ import {
   CheckCircle2,
   RotateCw,
   AlertCircle,
-} from 'lucide-react';
-import { sendOtp, verifyOtp } from '../../apis/auth/auth.service';
+} from "lucide-react";
+import { sendOtp, verifyOtp } from "../../apis/auth/auth.service";
 
 const VerifyEmailPage: React.FC = () => {
   const location = useLocation();
-  const emailFromState =
-    (location.state as { email?: string })?.email || '';
+  const emailFromState = (location.state as { email?: string })?.email || "";
 
-  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [resendTimer, setResendTimer] = useState(120);
 
@@ -43,7 +42,7 @@ const VerifyEmailPage: React.FC = () => {
   }, [resendTimer]);
 
   const formatTimer = (s: number) =>
-    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -62,17 +61,17 @@ const VerifyEmailPage: React.FC = () => {
     index: number,
     e: React.KeyboardEvent<HTMLInputElement>,
   ) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').trim();
+    const pastedData = e.clipboardData.getData("text").trim();
 
     if (/^\d{6}$/.test(pastedData)) {
-      setOtp(pastedData.split(''));
+      setOtp(pastedData.split(""));
       inputRefs.current[5]?.focus();
     }
   };
@@ -80,18 +79,18 @@ const VerifyEmailPage: React.FC = () => {
   const handleResendCode = async () => {
     if (resendTimer > 0 || resendLoading) return;
 
-    setError('');
+    setError("");
     setResendLoading(true);
 
     try {
       await sendOtp(emailFromState);
       setResendTimer(120);
-      setOtp(['', '', '', '', '', '']);
+      setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
-          'Failed to resend verification code. Please try again.',
+          "Failed to resend verification code. Please try again.",
       );
     } finally {
       setResendLoading(false);
@@ -100,31 +99,26 @@ const VerifyEmailPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
-    const code = otp.join('');
+    const code = otp.join("");
     if (code.length < 6) {
-      setError('Please enter all 6 digits of the verification code.');
+      setError("Please enter all 6 digits of the verification code.");
       return;
     }
 
     setLoading(true);
 
     try {
-      await verifyOtp(emailFromState, code);
-
-      // Mark email as verified locally
-      localStorage.setItem('isVerified', 'true');
-      setSuccess(true);
-
-      setTimeout(() => {
-        navigate('/login');
-      }, 1500);
+      const res = await verifyOtp(emailFromState, code);
+      if (res?.success === true) {
+        setSuccess(true);
+        setTimeout(() => {
+          navigate("/login");
+        }, 1000);
+      }
     } catch (err: any) {
-      setError(
-        err?.response?.data?.message ||
-          'Invalid or expired code. Please request a new one.',
-      );
+      setError(err?.response?.data?.message);
     } finally {
       setLoading(false);
     }
@@ -144,11 +138,13 @@ const VerifyEmailPage: React.FC = () => {
           <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
             {emailFromState ? (
               <>
-                A 6-digit code has been sent to{' '}
-                <strong className="text-slate-800 font-semibold">{emailFromState}</strong>
+                A 6-digit code has been sent to{" "}
+                <strong className="text-slate-800 font-semibold">
+                  {emailFromState}
+                </strong>
               </>
             ) : (
-              'Enter the 6-digit verification code sent to your registered email.'
+              "Enter the 6-digit verification code sent to your registered email."
             )}
           </p>
         </div>
@@ -160,7 +156,10 @@ const VerifyEmailPage: React.FC = () => {
               role="alert"
               className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm animate-in fade-in"
             >
-              <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-600" />
+              <AlertCircle
+                size={16}
+                className="shrink-0 mt-0.5 text-rose-600"
+              />
               <span className="leading-snug">{error}</span>
             </div>
           )}
@@ -170,9 +169,12 @@ const VerifyEmailPage: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
                 <CheckCircle2 size={26} />
               </div>
-              <h2 className="text-lg font-bold text-slate-900">Email Verified Successfully!</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                Email Verified Successfully!
+              </h2>
               <p className="text-xs text-slate-500">
-                Your institutional account is now verified. Redirecting you to sign in...
+                Your institutional account is now verified. Redirecting you to
+                sign in...
               </p>
             </div>
           ) : (
@@ -207,7 +209,7 @@ const VerifyEmailPage: React.FC = () => {
               {/* Resend and Timer Bar */}
               <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                 <span>
-                  Code expires in:{' '}
+                  Code expires in:{" "}
                   <strong className="text-slate-700 font-semibold">
                     {formatTimer(resendTimer)}
                   </strong>
@@ -220,7 +222,7 @@ const VerifyEmailPage: React.FC = () => {
                 >
                   <RotateCw
                     size={12}
-                    className={resendLoading ? 'animate-spin' : ''}
+                    className={resendLoading ? "animate-spin" : ""}
                   />
                   <span>Resend Code</span>
                 </button>
