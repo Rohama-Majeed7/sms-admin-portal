@@ -2,11 +2,11 @@
 import {
   Building2,
   Users,
-  BookOpen,
   GraduationCap,
   ArrowUpRight,
   Calendar,
 } from "lucide-react";
+import { getSchoolById } from "../../apis/school/school.api";
 
 const DashboardPage: React.FC = () => {
   const school = localStorage.getItem("user")
@@ -20,39 +20,51 @@ const DashboardPage: React.FC = () => {
     });
     return `${monthName} ${d.getFullYear()}`;
   };
+
+  const [teacherCount, setTeacherCount] = React.useState<number>(0);
+  const [studentCount, setStudentCount] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    const fetchSchoolById = async () => {
+      try {
+        const res = await getSchoolById(school?.id);
+        if (res.success === true) {
+          const teachers = res?.data?.users?.filter((user: any) => user?.role === "TEACHER") || [];
+          const students = res?.data?.users?.filter((user: any) => user?.role === "STUDENT") || [];
+          setTeacherCount(teachers?.length);
+          setStudentCount(students?.length);
+        }
+      } catch (error) {
+        console.error("Error fetching school data:", error);
+      }
+    };
+
+    fetchSchoolById();
+  }, []);
+
   const stats = [
     {
       label: "Institution Status",
       value: school?.status === "ACTIVE" ? "Active" : school?.status === "PENDING" ? "Pending" : "Inactive",
       change: "Verified Institution",
       icon: Building2,
-      trend: "100%",
       color: "bg-indigo-50 text-indigo-600 border-indigo-100",
     },
     {
       label: "Enrolled Students",
-      value: "1,248",
-      change: "+42 this term",
+      value: studentCount.toString(),
+      change: "Active students",
       icon: GraduationCap,
-      trend: "+4%",
       color: "bg-violet-50 text-violet-600 border-violet-100",
     },
     {
       label: "Academic Staff",
-      value: "86",
+      value: teacherCount.toString(),
       change: "Active faculty",
       icon: Users,
-      trend: "+2%",
       color: "bg-sky-50 text-sky-600 border-sky-100",
     },
-    {
-      label: "Active Courses",
-      value: "34",
-      change: "Full curriculum",
-      icon: BookOpen,
-      trend: "+5%",
-      color: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    },
+    
   ];
 
   return (
@@ -97,7 +109,7 @@ const DashboardPage: React.FC = () => {
 
       {/* KPI Stats Grid */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {stats.map(({ label, value, change, icon: Icon, trend, color }) => (
+        {stats.map(({ label, value, change, icon: Icon, color }) => (
           <div
             key={label}
             className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:shadow-md hover:border-slate-300/90 transition-all group"
@@ -108,10 +120,7 @@ const DashboardPage: React.FC = () => {
               >
                 <Icon size={20} strokeWidth={2.1} />
               </div>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                <ArrowUpRight size={13} />
-                {trend}
-              </span>
+              
             </div>
 
             <p className="text-xs font-medium text-slate-500">{label}</p>

@@ -62,7 +62,6 @@ const SchoolSettingsPage: React.FC = () => {
         });
       } catch (err) {
         console.error("Failed to fetch school details:", err);
-        toast.error("An error occurred while fetching school details.");
       } finally {
         setLoading(false);
       }

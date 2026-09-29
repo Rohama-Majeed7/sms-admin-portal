@@ -10,9 +10,8 @@ import {
   Edit2,
   Eye,
   Mail,
-  
 } from "lucide-react";
-import type { Teacher} from "../../types/teacher";
+import type { Teacher } from "../../types/teacher";
 import { initialTeachers } from "../../data/mockTeachers";
 import { getSchoolById } from "../../apis/school/school.api";
 
@@ -45,9 +44,7 @@ const getInitials = (name: string) => {
 const TeachersPage: React.FC = () => {
   const [teachers, setTeachers] = useState<Teacher[]>(initialTeachers);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | boolean>(
-    "All",
-  );
+  const [statusFilter, setStatusFilter] = useState<"All" | boolean>("All");
   const [subjectFilter, setSubjectFilter] = useState<string>("All");
 
   const school =
@@ -56,10 +53,10 @@ const TeachersPage: React.FC = () => {
     const fetchStudents = async () => {
       const response = await getSchoolById(school?.id);
       if (response?.success) {
-        const studentsData = response?.data?.users?.filter(
+        const teachersData = response?.data?.users?.filter(
           (user: any) => user.role === "TEACHER",
         );
-        setTeachers(studentsData || []);
+        setTeachers(teachersData || []);
       }
     };
     fetchStudents();
@@ -122,7 +119,11 @@ const TeachersPage: React.FC = () => {
               <button
                 key={status}
                 type="button"
-                onClick={() => setStatusFilter(status === "All" ? "All" : status === "Active")}
+                onClick={() =>
+                  setStatusFilter(
+                    status === "All" ? "All" : status === "Active",
+                  )
+                }
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   statusFilter === status
                     ? "bg-white text-slate-900 shadow-xs"
@@ -204,7 +205,6 @@ const TeachersPage: React.FC = () => {
                           <p className="font-semibold text-slate-900 text-sm leading-tight">
                             {teacher.name}
                           </p>
-                          
                         </div>
                       </div>
                     </td>
@@ -218,8 +218,7 @@ const TeachersPage: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    
-                    
+
                     <td className="py-3.5 px-4">
                       {statusBadge(teacher?.isVerified)}
                     </td>
@@ -276,28 +275,15 @@ const TeachersPage: React.FC = () => {
                       <p className="font-semibold text-slate-900 text-sm">
                         {teacher.name}
                       </p>
-                      
                     </div>
                   </div>
                   {statusBadge(teacher?.isVerified)}
                 </div>
-
-                
-
-               
               </div>
             ))
           )}
         </div>
       </section>
-
-     
-
-      
-
-     
-
-     
     </div>
   );
 };
