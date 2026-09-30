@@ -17,6 +17,11 @@ import {
   verifyOtp,
   resetPassword,
 } from '../../apis/auth/auth.service';
+import {
+  validateEmail,
+  validatePassword,
+  validateConfirmPassword,
+} from '../../utils/validation';
 
 type Step = 'email' | 'otp' | 'reset';
 
@@ -26,6 +31,7 @@ const ForgotPasswordPage: React.FC = () => {
   // Step 1 – Email
   const [email, setEmail] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   // Step 2 – OTP
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
@@ -37,7 +43,10 @@ const ForgotPasswordPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
   // Shared
   const [error, setError] = useState('');
@@ -62,9 +71,12 @@ const ForgotPasswordPage: React.FC = () => {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailError('');
 
-    if (!email.trim()) {
-      setError('Please enter your work email address.');
+    const emailCheck = validateEmail(email, 'Administrator Email');
+    if (!emailCheck.isValid) {
+      setError(emailCheck.error || 'Please enter a valid email address.');
+      setEmailError(emailCheck.error || 'Please enter a valid email address.');
       return;
     }
 
@@ -141,7 +153,7 @@ const ForgotPasswordPage: React.FC = () => {
     setError('');
 
     const code = otp.join('');
-    if (code.length < 6) {
+    if (code.length < 6 || !/^\d{6}$/.test(code)) {
       setError('Please enter all 6 digits of the code.');
       return;
     }
@@ -165,14 +177,20 @@ const ForgotPasswordPage: React.FC = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setPasswordError('');
+    setConfirmPasswordError('');
 
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
+    const pwdCheck = validatePassword(newPassword, 'New Password');
+    if (!pwdCheck.isValid) {
+      setError(pwdCheck.error || 'Invalid password.');
+      setPasswordError(pwdCheck.error || 'Invalid password.');
       return;
     }
 
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
+    const confirmCheck = validateConfirmPassword(newPassword, confirmPassword);
+    if (!confirmCheck.isValid) {
+      setError(confirmCheck.error || 'Passwords do not match.');
+      setConfirmPasswordError(confirmCheck.error || 'Passwords do not match.');
       return;
     }
 
@@ -281,7 +299,7 @@ const ForgotPasswordPage: React.FC = () => {
             <>
               {/* STEP 1: Enter Email */}
               {step === 'email' && (
-                <form onSubmit={handleSendOtp} className="space-y-4">
+                <form onSubmit={handleSendOtp} noValidate className="space-y-4">
                   <div className="space-y-1.5">
                     <label
                       htmlFor="reset-email"
@@ -299,14 +317,28 @@ const ForgotPasswordPage: React.FC = () => {
                         type="email"
                         required
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (emailError) setEmailError('');
+                        }}
                         placeholder="admin@school.edu"
-                        className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                          emailError
+                            ? 'border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20'
+                            : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
+                        }`}
                       />
                     </div>
-                    <p className="text-xs text-slate-400">
-                      We will send a 6-digit security code to this address.
-                    </p>
+                    {emailError ? (
+                      <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle size={12} className="shrink-0" />
+                        <span>{emailError}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        We will send a 6-digit security code to this address.
+                      </p>
+                    )}
                   </div>
 
                   <button
@@ -331,7 +363,7 @@ const ForgotPasswordPage: React.FC = () => {
 
               {/* STEP 2: Verify 6-digit OTP */}
               {step === 'otp' && (
-                <form onSubmit={handleVerifyOtp} className="space-y-5">
+                <form onSubmit={handleVerifyOtp} noValidate className="space-y-5">
                   <div className="space-y-2 text-center">
                     <p className="text-xs text-slate-500">
                       We sent a 6-digit code to <strong className="text-slate-800">{email}</strong>
@@ -393,14 +425,17 @@ const ForgotPasswordPage: React.FC = () => {
 
               {/* STEP 3: Enter New Password */}
               {step === 'reset' && (
-                <form onSubmit={handleResetPassword} className="space-y-4">
+                <form onSubmit={handleResetPassword} noValidate className="space-y-4">
                   <div className="space-y-1.5">
-                    <label
-                      htmlFor="new-pwd"
-                      className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
-                    >
-                      New Password
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor="new-pwd"
+                        className="block text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                      >
+                        New Password
+                      </label>
+                      <span className="text-[11px] text-slate-400">Min. 8 characters</span>
+                    </div>
                     <div className="relative">
                       <Lock
                         size={16}
@@ -411,18 +446,32 @@ const ForgotPasswordPage: React.FC = () => {
                         type={showPassword ? 'text' : 'password'}
                         required
                         value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Min. 6 characters"
-                        className="w-full h-11 pl-10 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          if (passwordError) setPasswordError('');
+                        }}
+                        placeholder="Create strong password "
+                        className={`w-full h-11 pl-10 pr-11 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                          passwordError
+                            ? 'border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20'
+                            : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
+                        }`}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        aria-label="Toggle Password Visibility"
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
+                    {passwordError && (
+                      <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle size={12} className="shrink-0" />
+                        <span>{passwordError}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -439,14 +488,35 @@ const ForgotPasswordPage: React.FC = () => {
                       />
                       <input
                         id="confirm-pwd"
-                        type={showPassword ? 'text' : 'password'}
+                        type={showConfirmPassword ? 'text' : 'password'}
                         required
                         value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          if (confirmPasswordError) setConfirmPasswordError('');
+                        }}
                         placeholder="Repeat your new password"
-                        className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        className={`w-full h-11 pl-10 pr-11 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                          confirmPasswordError
+                            ? 'border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20'
+                            : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
+                        }`}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        aria-label="Toggle Confirm Password Visibility"
+                      >
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
+                    {confirmPasswordError && (
+                      <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle size={12} className="shrink-0" />
+                        <span>{confirmPasswordError}</span>
+                      </p>
+                    )}
                   </div>
 
                   <button

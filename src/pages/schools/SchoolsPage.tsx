@@ -11,7 +11,9 @@ import {
   X,
   Trash2,
   ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
+import { validateRequired } from '../../utils/validation';
 
 interface SchoolItem {
   id: number;
@@ -78,6 +80,7 @@ const SchoolsPage: React.FC = () => {
     courses: '',
     status: 'Active' as 'Active' | 'Pending' | 'Inactive',
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
 
   // Dropdown menu state
@@ -130,10 +133,22 @@ const SchoolsPage: React.FC = () => {
     e.preventDefault();
     setFormError('');
 
-    if (!formData.name.trim() || !formData.location.trim()) {
-      setFormError('Please provide both school name and location.');
+    const errors: Record<string, string> = {};
+    const nameResult = validateRequired(formData.name, 'School name');
+    if (!nameResult.isValid) {
+      errors.name = nameResult.error || 'School name is required.';
+    }
+
+    const locationResult = validateRequired(formData.location, 'Location');
+    if (!locationResult.isValid) {
+      errors.location = locationResult.error || 'Location is required.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
+    setFieldErrors({});
 
     const newSchool: SchoolItem = {
       id: Date.now(),
@@ -155,6 +170,7 @@ const SchoolsPage: React.FC = () => {
       courses: '',
       status: 'Active',
     });
+    setFieldErrors({});
     setIsAddModalOpen(false);
   };
 
@@ -473,7 +489,7 @@ const SchoolsPage: React.FC = () => {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleAddSchoolSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleAddSchoolSubmit} noValidate className="p-6 space-y-4">
               {formError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">
                   {formError}
@@ -486,12 +502,24 @@ const SchoolsPage: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. St. Jude International Academy"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.name
+                      ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10'
+                      : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                  }`}
                 />
+                {fieldErrors.name && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.name}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -500,12 +528,24 @@ const SchoolsPage: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Nairobi"
                   value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  onChange={(e) => {
+                    setFormData({ ...formData, location: e.target.value });
+                    if (fieldErrors.location) setFieldErrors((prev) => ({ ...prev, location: '' }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.location
+                      ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10'
+                      : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                  }`}
                 />
+                {fieldErrors.location && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.location}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-3">

@@ -6,12 +6,19 @@ import {
   CheckCircle2,
   XCircle,
   X,
-  
   Mail,
+  AlertCircle,
 } from "lucide-react";
 import type { Student, StudentStatus } from "../../types/student";
-import { initialStudents } from "../../data/mockStudents";
 import { getSchoolById } from "../../apis/school/school.api";
+import {
+  validatePersonName,
+  validateEmail,
+  validatePakistaniMobileNumber,
+  validateRequired,
+} from "../../utils/validation";
+import PakistaniPhoneInput from "../../components/shared/PakistaniPhoneInput";
+
 const statusBadge = (status: StudentStatus) => {
   if (status === "Active") {
     return (
@@ -39,7 +46,7 @@ const getInitials = (name: string) => {
 };
 
 const StudentsPage: React.FC = () => {
-  const [students, setStudents] = useState<Student[]>(initialStudents);
+  const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | StudentStatus>(
     "All",
@@ -47,6 +54,18 @@ const StudentsPage: React.FC = () => {
   const [classFilter, setClassFilter] = useState<string>("All");
   const school =
     JSON.parse(localStorage.getItem("user") || "{}")?.schoolAdmin || null;
+
+  // Add Student Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    studentId: "",
+    email: "",
+    phone: "",
+    guardianName: "",
+  });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
     const fetchStudents = async () => {
       const response = await getSchoolById(school?.id);
@@ -59,6 +78,52 @@ const StudentsPage: React.FC = () => {
     };
     fetchStudents();
   }, []);
+
+  const handleAddStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const errors: Record<string, string> = {};
+
+    const nameRes = validatePersonName(formData.name, "Student name");
+    if (!nameRes.isValid) errors.name = nameRes.error || "Invalid student name.";
+
+    const idRes = validateRequired(formData.studentId, "Student ID");
+    if (!idRes.isValid) errors.studentId = idRes.error || "Student ID is required.";
+
+    const emailRes = validateEmail(formData.email);
+    if (!emailRes.isValid) errors.email = emailRes.error || "Invalid email address.";
+
+    const phoneRes = validatePakistaniMobileNumber(formData.phone);
+    if (!phoneRes.isValid) errors.phone = phoneRes.error || "Invalid phone number.";
+
+    const guardianRes = validatePersonName(formData.guardianName, "Guardian name");
+    if (!guardianRes.isValid) errors.guardianName = guardianRes.error || "Invalid guardian name.";
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    const newStudent: Student = {
+      id: Date.now(),
+      studentId: formData.studentId.trim(),
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      isVerified: true,
+    };
+
+    setStudents([newStudent, ...students]);
+    setFormData({
+      name: "",
+      studentId: "",
+      email: "",
+      phone: "",
+      guardianName: "",
+    });
+    setFieldErrors({});
+    setIsAddModalOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* Page Header */}
@@ -75,10 +140,10 @@ const StudentsPage: React.FC = () => {
 
         <button
           type="button"
-          // onClick={() => {
-          //   setFormError('');
-          //   setIsAddModalOpen(true);
-          // }}
+          onClick={() => {
+            setFieldErrors({});
+            setIsAddModalOpen(true);
+          }}
           className="self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-sm shadow-indigo-600/30 transition-all hover:shadow-md cursor-pointer"
         >
           <Plus size={16} strokeWidth={2.4} />
@@ -315,6 +380,172 @@ const StudentsPage: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* Add Student Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Add New Student</h3>
+                <p className="text-xs text-slate-500">Register a new pupil profile with verified records</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleAddStudent} noValidate className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Student Full Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Ali Ahmed"
+                  value={formData.name}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: "" }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.name
+                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  }`}
+                />
+                {fieldErrors.name && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.name}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Student ID / Roll No *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. STU-2024-001"
+                  value={formData.studentId}
+                  onChange={(e) => {
+                    setFormData({ ...formData, studentId: e.target.value });
+                    if (fieldErrors.studentId) setFieldErrors((prev) => ({ ...prev, studentId: "" }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.studentId
+                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  }`}
+                />
+                {fieldErrors.studentId && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.studentId}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  placeholder="student@example.com"
+                  value={formData.email}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: "" }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.email
+                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  }`}
+                />
+                {fieldErrors.email && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.email}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Pakistani Mobile Number *
+                </label>
+                <PakistaniPhoneInput
+                  value={formData.phone}
+                  onChange={(val: string) => {
+                    setFormData({ ...formData, phone: val });
+                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: "" }));
+                  }}
+                  hasError={Boolean(fieldErrors.phone)}
+                />
+                {fieldErrors.phone && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.phone}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Parent / Guardian Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Tariq Ahmed"
+                  value={formData.guardianName}
+                  onChange={(e) => {
+                    setFormData({ ...formData, guardianName: e.target.value });
+                    if (fieldErrors.guardianName) setFieldErrors((prev) => ({ ...prev, guardianName: "" }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.guardianName
+                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  }`}
+                />
+                {fieldErrors.guardianName && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.guardianName}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-xs shadow-indigo-600/30 cursor-pointer"
+                >
+                  Save Student
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -19,7 +19,13 @@ import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import type { SchoolStatus } from "../../types/school";
 import { getSchoolById, updateSchool } from "../../apis/school/school.api";
-import { validatePakistaniMobileNumber } from "../../utils/phoneValidation";
+import {
+  validatePersonName,
+  validateEmail,
+  validatePakistaniMobileNumber,
+  
+  validateRequired,
+} from "../../utils/validation";
 import PakistaniPhoneInput from "../../components/shared/PakistaniPhoneInput";
 
 interface FormErrors {
@@ -30,12 +36,15 @@ interface FormErrors {
   address?: string;
 }
 
+
+
 const SchoolSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const school =
-    JSON.parse(localStorage.getItem("user") || "{}").schoolAdmin || null;
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const school = user.schoolAdmin || null;
+
   // Form State
   const [formData, setFormData] = useState({
     name: "",
@@ -47,7 +56,10 @@ const SchoolSettingsPage: React.FC = () => {
 
   const [errors, setErrors] = useState<FormErrors>({});
 
-  // Fetch school details on mount (modularized for future backend GET integration)
+ 
+  
+
+  // Fetch school details on mount
   useEffect(() => {
     const fetchSchoolDetails = async () => {
       try {
@@ -84,7 +96,6 @@ const SchoolSettingsPage: React.FC = () => {
 
   const handleCancelEdit = () => {
     if (school) {
-      // Revert back to current school data
       setFormData({
         name: school.name || "",
         address: school.address || "",
@@ -100,27 +111,24 @@ const SchoolSettingsPage: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "School name is required.";
+    const nameCheck = validateRequired(formData.name, "School name");
+    if (!nameCheck.isValid) {
+      newErrors.name = nameCheck.error;
     }
 
-    if (!formData.ownerName.trim()) {
-      newErrors.ownerName = "Owner / Administrator name is required.";
+    const ownerNameCheck = validatePersonName(formData.ownerName, "Owner / Administrator name");
+    if (!ownerNameCheck.isValid) {
+      newErrors.ownerName = ownerNameCheck.error;
     }
 
-    if (!formData.ownerPhone.trim()) {
-      newErrors.ownerPhone = "Owner phone / mobile number is required.";
-    } else {
-      const phoneCheck = validatePakistaniMobileNumber(formData.ownerPhone);
-      if (!phoneCheck.isValid) {
-        newErrors.ownerPhone = phoneCheck.error;
-      }
+    const phoneCheck = validatePakistaniMobileNumber(formData.ownerPhone, "Owner phone / mobile number");
+    if (!phoneCheck.isValid) {
+      newErrors.ownerPhone = phoneCheck.error;
     }
 
-    if (!formData.ownerEmail.trim()) {
-      newErrors.ownerEmail = "Owner email address is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail.trim())) {
-      newErrors.ownerEmail = "Please enter a valid email address.";
+    const emailCheck = validateEmail(formData.ownerEmail, "Owner email address");
+    if (!emailCheck.isValid) {
+      newErrors.ownerEmail = emailCheck.error;
     }
 
     setErrors(newErrors);
@@ -167,6 +175,8 @@ const SchoolSettingsPage: React.FC = () => {
       setIsSaving(false);
     }
   };
+
+  
 
   const renderStatusBadge = (status: SchoolStatus = "ACTIVE") => {
     switch (status) {
@@ -283,7 +293,7 @@ const SchoolSettingsPage: React.FC = () => {
       </section>
 
       {/* Main Content Form / View */}
-      <form onSubmit={handleSave}>
+      <form onSubmit={handleSave} noValidate>
         <div className="space-y-6">
           {/* Card 1: Institutional Information */}
           <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
@@ -324,9 +334,12 @@ const SchoolSettingsPage: React.FC = () => {
                         id="schoolName"
                         type="text"
                         value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
+                        onChange={(e) => {
+                          setFormData({ ...formData, name: e.target.value });
+                          if (errors.name) {
+                            setErrors((prev) => ({ ...prev, name: undefined }));
+                          }
+                        }}
                         placeholder="e.g. Greenwood Academy"
                         className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                           errors.name
@@ -371,9 +384,12 @@ const SchoolSettingsPage: React.FC = () => {
                         id="schoolAddress"
                         type="text"
                         value={formData.address}
-                        onChange={(e) =>
-                          setFormData({ ...formData, address: e.target.value })
-                        }
+                        onChange={(e) => {
+                          setFormData({ ...formData, address: e.target.value });
+                          if (errors.address) {
+                            setErrors((prev) => ({ ...prev, address: undefined }));
+                          }
+                        }}
                         placeholder="e.g. 104 Academic Avenue, Nairobi, Kenya"
                         className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                       />
@@ -434,12 +450,15 @@ const SchoolSettingsPage: React.FC = () => {
                         id="ownerName"
                         type="text"
                         value={formData.ownerName}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             ownerName: e.target.value,
-                          })
-                        }
+                          });
+                          if (errors.ownerName) {
+                            setErrors((prev) => ({ ...prev, ownerName: undefined }));
+                          }
+                        }}
                         placeholder="e.g. Dr. Alex Morgan"
                         className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                           errors.ownerName
@@ -479,9 +498,12 @@ const SchoolSettingsPage: React.FC = () => {
                     <PakistaniPhoneInput
                       id="ownerPhone"
                       value={formData.ownerPhone}
-                      onChange={(fullPhone) =>
-                        setFormData({ ...formData, ownerPhone: fullPhone })
-                      }
+                      onChange={(fullPhone) => {
+                        setFormData({ ...formData, ownerPhone: fullPhone });
+                        if (errors.ownerPhone) {
+                          setErrors((prev) => ({ ...prev, ownerPhone: undefined }));
+                        }
+                      }}
                       hasError={!!errors.ownerPhone}
                     />
                     {errors.ownerPhone ? (
@@ -529,12 +551,15 @@ const SchoolSettingsPage: React.FC = () => {
                         id="ownerEmail"
                         type="email"
                         value={formData.ownerEmail}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             ownerEmail: e.target.value,
-                          })
-                        }
+                          });
+                          if (errors.ownerEmail) {
+                            setErrors((prev) => ({ ...prev, ownerEmail: undefined }));
+                          }
+                        }}
                         placeholder="admin@school.edu"
                         className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                           errors.ownerEmail
@@ -600,6 +625,8 @@ const SchoolSettingsPage: React.FC = () => {
           </div>
         </div>
       </form>
+
+     
     </div>
   );
 };

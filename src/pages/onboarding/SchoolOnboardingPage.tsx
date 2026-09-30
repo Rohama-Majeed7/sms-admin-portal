@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Building2,
@@ -19,8 +19,20 @@ import type { School, SchoolStatus } from "../../types/school";
 import { logout } from "../../apis/auth/auth.service";
 import { createSchool, updateSchool } from "../../apis/school/school.api";
 import { toast } from "react-toastify";
-import { validatePakistaniMobileNumber } from "../../utils/phoneValidation";
+import {
+  validatePersonName,
+  validateEmail,
+  validatePakistaniMobileNumber,
+  validateRequired,
+} from "../../utils/validation";
 import PakistaniPhoneInput from "../../components/shared/PakistaniPhoneInput";
+
+interface OnboardingFieldErrors {
+  name?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  ownerEmail?: string;
+}
 
 const SchoolOnboardingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -37,6 +49,7 @@ const SchoolOnboardingPage: React.FC = () => {
   const [warning, setWarning] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<OnboardingFieldErrors>({});
 
   useEffect(() => {
     if (
@@ -72,31 +85,35 @@ const SchoolOnboardingPage: React.FC = () => {
     e.preventDefault();
     setError("");
 
-    // Validations
-    if (!name.trim()) {
-      setError("Please provide the school name.");
-      return;
-    }
-    if (!ownerName.trim()) {
-      setError("Please provide the school owner / admin name.");
-      return;
-    }
-    if (!ownerPhone.trim()) {
-      setError("Please provide the owner mobile / phone number.");
-      return;
+    const errors: OnboardingFieldErrors = {};
+
+    const nameValidation = validateRequired(name, "School Name");
+    if (!nameValidation.isValid) {
+      errors.name = nameValidation.error;
     }
 
-    const phoneCheck = validatePakistaniMobileNumber(ownerPhone);
+    const ownerNameValidation = validatePersonName(ownerName, "Owner Name");
+    if (!ownerNameValidation.isValid) {
+      errors.ownerName = ownerNameValidation.error;
+    }
+
+    const phoneCheck = validatePakistaniMobileNumber(ownerPhone, "Owner Phone");
     if (!phoneCheck.isValid) {
-      setError(phoneCheck.error || "Please enter a valid Pakistani mobile number.");
+      errors.ownerPhone = phoneCheck.error;
+    }
+
+    const emailCheck = validateEmail(ownerEmail, "Owner Email");
+    if (!emailCheck.isValid) {
+      errors.ownerEmail = emailCheck.error;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError("Please correct the highlighted fields before submitting.");
       return;
     }
 
-    if (!ownerEmail.trim()) {
-      setError("Please provide the owner email address.");
-      return;
-    }
-
+    setFieldErrors({});
     setLoading(true);
 
     const schoolData: School = {
@@ -235,7 +252,7 @@ const SchoolOnboardingPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} noValidate className="space-y-5">
               {/* Institution Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
@@ -264,10 +281,25 @@ const SchoolOnboardingPage: React.FC = () => {
                       required
                       placeholder="e.g. St. Christopher International School"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (fieldErrors.name) {
+                          setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                        }
+                      }}
+                      className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                        fieldErrors.name
+                          ? "border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20"
+                          : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+                      }`}
                     />
                   </div>
+                  {fieldErrors.name && (
+                    <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                      <AlertCircle size={12} className="shrink-0" />
+                      <span>{fieldErrors.name}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Address (Optional) */}
@@ -327,10 +359,25 @@ const SchoolOnboardingPage: React.FC = () => {
                       required
                       placeholder="e.g. Muhammad Ali"
                       value={ownerName}
-                      onChange={(e) => setOwnerName(e.target.value)}
-                      className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      onChange={(e) => {
+                        setOwnerName(e.target.value);
+                        if (fieldErrors.ownerName) {
+                          setFieldErrors((prev) => ({ ...prev, ownerName: undefined }));
+                        }
+                      }}
+                      className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                        fieldErrors.ownerName
+                          ? "border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20"
+                          : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+                      }`}
                     />
                   </div>
+                  {fieldErrors.ownerName && (
+                    <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                      <AlertCircle size={12} className="shrink-0" />
+                      <span>{fieldErrors.ownerName}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -346,11 +393,24 @@ const SchoolOnboardingPage: React.FC = () => {
                       id="ownerPhone"
                       required
                       value={ownerPhone}
-                      onChange={(fullPhone) => setOwnerPhone(fullPhone)}
+                      hasError={!!fieldErrors.ownerPhone}
+                      onChange={(fullPhone) => {
+                        setOwnerPhone(fullPhone);
+                        if (fieldErrors.ownerPhone) {
+                          setFieldErrors((prev) => ({ ...prev, ownerPhone: undefined }));
+                        }
+                      }}
                     />
-                    <p className="text-[11px] text-slate-400">
-                      +92 is persistent. Enter 10 digits (e.g. <code className="font-semibold text-slate-600">3000000000</code>).
-                    </p>
+                    {fieldErrors.ownerPhone ? (
+                      <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle size={12} className="shrink-0" />
+                        <span>{fieldErrors.ownerPhone}</span>
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">
+                        +92 is persistent. Enter 10 digits (e.g. <code className="font-semibold text-slate-600">3000000000</code>).
+                      </p>
+                    )}
                   </div>
 
                   {/* Owner Email */}
@@ -372,10 +432,25 @@ const SchoolOnboardingPage: React.FC = () => {
                         required
                         placeholder="owner@school.edu.pk"
                         value={ownerEmail}
-                        onChange={(e) => setOwnerEmail(e.target.value)}
-                        className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        onChange={(e) => {
+                          setOwnerEmail(e.target.value);
+                          if (fieldErrors.ownerEmail) {
+                            setFieldErrors((prev) => ({ ...prev, ownerEmail: undefined }));
+                          }
+                        }}
+                        className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                          fieldErrors.ownerEmail
+                            ? "border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20"
+                            : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+                        }`}
                       />
                     </div>
+                    {fieldErrors.ownerEmail && (
+                      <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle size={12} className="shrink-0" />
+                        <span>{fieldErrors.ownerEmail}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

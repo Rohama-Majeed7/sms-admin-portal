@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   MailCheck,
@@ -101,8 +101,13 @@ const VerifyEmailPage: React.FC = () => {
     e.preventDefault();
     setError("");
 
+    if (!emailFromState.trim()) {
+      setError("Email address is missing. Please return to login and try again.");
+      return;
+    }
+
     const code = otp.join("");
-    if (code.length < 6) {
+    if (code.length < 6 || !/^\d{6}$/.test(code)) {
       setError("Please enter all 6 digits of the verification code.");
       return;
     }

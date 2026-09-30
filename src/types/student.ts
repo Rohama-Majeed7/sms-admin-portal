@@ -5,5 +5,13 @@ export interface Student {
   studentId: string;
   name: string;
   email: string;
-  isVerified: boolean;
+  isVerified?: boolean;
+  phone?: string;
+  class?: string;
+  section?: string;
+  gender?: string;
+  status?: StudentStatus;
+  rollNo?: string;
+  guardianName?: string;
+  admissionDate?: string;
 }

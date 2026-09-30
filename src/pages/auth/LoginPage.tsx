@@ -10,6 +10,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { login } from "../../apis/auth/auth.service";
+import { validateEmail, validatePassword } from "../../utils/validation";
+
+interface FieldErrors {
+  email?: string;
+  password?: string;
+}
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -17,6 +23,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const navigate = useNavigate();
 
   const hasActiveSchool = () => {
@@ -35,25 +42,32 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError("");
 
-    if (!email || !password) {
-      setError("Please enter both email and password.");
+    const errors: FieldErrors = {};
+
+    const emailValidation = validateEmail(email, "Work Email Address");
+    if (!emailValidation.isValid) {
+      errors.email = emailValidation.error;
+    }
+
+    const passwordValidation = validatePassword(password, "Password");
+    if (!passwordValidation.isValid) {
+      errors.password = passwordValidation.error;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
-    // Guard: only allow login if email has been verified
-    // const isVerified = localStorage.getItem('isVerified');
-    // if (isVerified !== null && isVerified !== 'true') {
-    //   navigate('/verify-email', { state: { email } });
-    //   return;
-    // }
+    setFieldErrors({});
 
     try {
       setLoading(true);
-      const res = await login(email, password);
+      const res = await login(email.trim(), password);
       // localStorage.setItem('isVerified', JSON.stringify(res?.data?.isVerified));
       localStorage.setItem("user", JSON.stringify(res?.data));
       if (res?.data?.isVerified === false) {
-        navigate("/verify-email", { state: { email } });
+        navigate("/verify-email", { state: { email: email.trim() } });
         return;
       }
       if (hasActiveSchool()) {
@@ -62,10 +76,10 @@ const LoginPage: React.FC = () => {
         navigate("/onboarding");
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message);
-      if (err?.response?.data?.message.includes("not verified")) {
+      setError(err?.response?.data?.message || "Login failed. Please check your credentials.");
+      if (err?.response?.data?.message?.includes("not verified")) {
         setTimeout(() => {
-          navigate("/verify-email", { state: { email } });
+          navigate("/verify-email", { state: { email: email.trim() } });
         }, 1000);
       }
     } finally {
@@ -101,7 +115,7 @@ const LoginPage: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {/* Email Field */}
             <div className="space-y-1.5">
               <label
@@ -121,11 +135,26 @@ const LoginPage: React.FC = () => {
                   required
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) {
+                      setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                    }
+                  }}
                   placeholder="admin@school.edu"
-                  className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  className={`w-full h-11 pl-10 pr-4 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.email
+                      ? "border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20"
+                      : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+                  }`}
                 />
               </div>
+              {fieldErrors.email && (
+                <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle size={12} className="shrink-0" />
+                  <span>{fieldErrors.email}</span>
+                </p>
+              )}
             </div>
 
             {/* Password Field */}
@@ -149,9 +178,18 @@ const LoginPage: React.FC = () => {
                   required
                   autoComplete="current-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) {
+                      setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }
+                  }}
                   placeholder="Enter your account password"
-                  className="w-full h-11 pl-10 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  className={`w-full h-11 pl-10 pr-11 bg-slate-50 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
+                    fieldErrors.password
+                      ? "border-rose-300 ring-2 ring-rose-500/10 focus:border-rose-500 focus:ring-rose-500/20"
+                      : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+                  }`}
                 />
                 <button
                   type="button"
@@ -162,6 +200,12 @@ const LoginPage: React.FC = () => {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle size={12} className="shrink-0" />
+                  <span>{fieldErrors.password}</span>
+                </p>
+              )}
             </div>
 
             {/* Remember Me */}
