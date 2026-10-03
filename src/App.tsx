@@ -11,6 +11,8 @@ import SignupPage from "./pages/auth/SignupPage";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import { ToastContainer } from "react-toastify";
+import StudentDetailsPage from "./pages/students/StudentDetailsPage";
+import TeacherDetailsPage from "./pages/teachers/TeacherDetailsPage";
 
 const isAuthenticated = () => !!localStorage.getItem("accessToken");
 const isAdmin = () => {
@@ -132,34 +134,57 @@ const App = () => {
             element={
               <ActiveSchoolRoute
                 element={
-                  <AdminLayout
-                    pageTitle="Teachers"
-                    activePath="/teachers"
-                  >
+                  <AdminLayout pageTitle="Teachers" activePath="/teachers">
                     <TeachersPage />
                   </AdminLayout>
                 }
               />
             }
           />
-
+          <Route
+            path="/teachers/:id"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout
+                    pageTitle="Teacher Details"
+                    activePath="/teachers"
+                  >
+                    <TeacherDetailsPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
           {/* Protected Students route — requires active school */}
           <Route
             path="/students"
             element={
               <ActiveSchoolRoute
                 element={
-                  <AdminLayout
-                    pageTitle="Students"
-                    activePath="/students"
-                  >
+                  <AdminLayout pageTitle="Students" activePath="/students">
                     <StudentsPage />
                   </AdminLayout>
                 }
               />
             }
           />
-
+          {/* Protected Student Details route — requires active school */}
+          <Route
+            path="/students/:id"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout
+                    pageTitle="Student Details"
+                    activePath="/students"
+                  >
+                    <StudentDetailsPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
           {/* Protected School Settings route — requires active school */}
           <Route
             path="/settings"

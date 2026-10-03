@@ -6,12 +6,10 @@ export interface Student {
   name: string;
   email: string;
   isVerified?: boolean;
-  phone?: string;
-  class?: string;
-  section?: string;
-  gender?: string;
-  status?: StudentStatus;
-  rollNo?: string;
-  guardianName?: string;
-  admissionDate?: string;
-}
+  userId: string;
+  dateOfBirth: string;
+  gender: string;
+  address: string;
+  guardianName: string;
+  guardianPhone: string;
+} 

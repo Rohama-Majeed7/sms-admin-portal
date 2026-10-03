@@ -4,11 +4,9 @@ export interface Teacher {
   name: string;
   email: string;
   isVerified?: boolean;
-  phone?: string;
-  subject?: string;
+  employeeNumber?: string;
   qualification?: string;
-  status?: string;
-  department?: string;
-  experience?: string;
+  specialization?: string;
   joiningDate?: string;
+  role: string;
 }

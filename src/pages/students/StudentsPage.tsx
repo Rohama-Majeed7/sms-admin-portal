@@ -8,9 +8,14 @@ import {
   X,
   Mail,
   AlertCircle,
+  Eye,
+  Trash2,
 } from "lucide-react";
 import type { Student, StudentStatus } from "../../types/student";
-import { getSchoolById } from "../../apis/school/school.api";
+import {
+  deleteSchoolStudent,
+  getSchoolStudents,
+} from "../../apis/school/school.api";
 import {
   validatePersonName,
   validateEmail,
@@ -18,6 +23,9 @@ import {
   validateRequired,
 } from "../../utils/validation";
 import PakistaniPhoneInput from "../../components/shared/PakistaniPhoneInput";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "react-toastify";
+import Pagination from "../../components/shared/Pagination";
 
 const statusBadge = (status: StudentStatus) => {
   if (status === "Active") {
@@ -45,15 +53,84 @@ const getInitials = (name: string) => {
     .join("");
 };
 
+const LIMIT = 10;
+
 const StudentsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read URL query parameters
+  const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
+  const statusFilter = searchParams.get("status") || "All";
+  const searchParam = searchParams.get("search") || "";
+
+  // Local state
+  const [search, setSearch] = useState(searchParam);
   const [students, setStudents] = useState<Student[]>([]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | StudentStatus>(
-    "All",
-  );
-  const [classFilter, setClassFilter] = useState<string>("All");
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+
   const school =
     JSON.parse(localStorage.getItem("user") || "{}")?.schoolAdmin || null;
+
+  // Sync URL search params helper
+  const updateUrlParams = (newParams: {
+    page?: number;
+    status?: string;
+    search?: string;
+  }) => {
+    const nextParams = new URLSearchParams(searchParams);
+    const nextPage = newParams.page !== undefined ? newParams.page : 1;
+    nextParams.set("page", String(nextPage));
+    nextParams.set("limit", String(LIMIT));
+
+    if (newParams.status !== undefined) {
+      nextParams.set("status", newParams.status);
+    } else if (!nextParams.has("status")) {
+      nextParams.set("status", "All");
+    }
+
+    if (newParams.search !== undefined) {
+      if (newParams.search.trim()) {
+        nextParams.set("search", newParams.search.trim());
+      } else {
+        nextParams.delete("search");
+      }
+    }
+
+    setSearchParams(nextParams);
+  };
+
+  // Ensure default URL query parameters are present on initial load
+  useEffect(() => {
+    const hasPage = searchParams.has("page");
+    const hasLimit = searchParams.has("limit");
+    const hasStatus = searchParams.has("status");
+    if (!hasPage || !hasLimit || !hasStatus) {
+      const nextParams = new URLSearchParams(searchParams);
+      if (!hasPage) nextParams.set("page", "1");
+      if (!hasLimit) nextParams.set("limit", String(LIMIT));
+      if (!hasStatus) nextParams.set("status", "All");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, []);
+
+  // Sync local search input when URL search changes (e.g. back/forward navigation)
+  useEffect(() => {
+    setSearch(searchParam);
+  }, [searchParam]);
+
+  // Debounce search input to update URL params
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (search.trim() !== searchParam.trim()) {
+        updateUrlParams({ search, page: 1 });
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Add Student Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -66,18 +143,109 @@ const StudentsPage: React.FC = () => {
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  const deleteStudent = async (id: number) => {
+    try {
+      const schoolId = school?.id || 1;
+      const res = await deleteSchoolStudent(schoolId, Number(id));
+      if (res?.success) {
+        toast.success(res.message || "Student deleted successfully.");
+        setRefetchTrigger((prev) => prev + 1);
+      }
+    } catch (error: unknown) {
+      const message =
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        error.response &&
+        typeof error.response === "object" &&
+        "data" in error.response &&
+        error.response.data &&
+        typeof error.response.data === "object" &&
+        "message" in error.response.data &&
+        typeof error.response.data.message === "string"
+          ? error.response.data.message
+          : "Failed to delete student.";
+      toast.error(message);
+    }
+  };
+
+  // Fetch students with backend pagination, status, and search
   useEffect(() => {
     const fetchStudents = async () => {
-      const response = await getSchoolById(school?.id);
-      if (response?.success) {
-        const studentsData = response?.data?.users?.filter(
-          (user: any) => user.role === "STUDENT",
-        );
-        setStudents(studentsData || []);
+      setIsLoading(true);
+      try {
+        const schoolId = school?.id || 1;
+        const response = await getSchoolStudents(schoolId, {
+          status: statusFilter,
+          search: searchParam,
+          page: currentPage,
+          limit: LIMIT,
+        });
+
+        if (response?.success) {
+          const rawData = response?.data;
+          let list: Student[] = [];
+
+          if (Array.isArray(rawData)) {
+            list = rawData;
+          } else if (rawData && typeof rawData === "object") {
+            const possibleList =
+              rawData.students || rawData.items || rawData.data || [];
+            list = Array.isArray(possibleList) ? possibleList : [];
+          }
+
+          const rawTotal =
+            response?.total ??
+            response?.totalCount ??
+            response?.count ??
+            response?.meta?.total ??
+            response?.pagination?.total ??
+            rawData?.total ??
+            rawData?.totalCount ??
+            rawData?.count ??
+            rawData?.meta?.total ??
+            rawData?.pagination?.total;
+
+          const rawTotalPages =
+            response?.totalPages ??
+            response?.meta?.totalPages ??
+            response?.pagination?.totalPages ??
+            rawData?.totalPages ??
+            rawData?.meta?.totalPages ??
+            rawData?.pagination?.totalPages;
+
+          // If backend returned more than LIMIT items in one call (fallback client-side pagination)
+          if (list.length > LIMIT) {
+            const actualTotal = rawTotal ?? list.length;
+            setTotalItems(actualTotal);
+            setTotalPages(Math.max(1, Math.ceil(actualTotal / LIMIT)));
+            const startIndex = (currentPage - 1) * LIMIT;
+            setStudents(list.slice(startIndex, startIndex + LIMIT));
+          } else {
+            const actualTotal =
+              rawTotal ??
+              (currentPage === 1
+                ? list.length
+                : (currentPage - 1) * LIMIT + list.length);
+            const calculatedPages =
+              rawTotalPages ?? Math.max(1, Math.ceil(actualTotal / LIMIT));
+            setTotalItems(actualTotal);
+            setTotalPages(calculatedPages);
+            setStudents(list);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching students:", error);
+        setStudents([]);
+        setTotalItems(0);
+        setTotalPages(1);
+      } finally {
+        setIsLoading(false);
       }
     };
+
     fetchStudents();
-  }, []);
+  }, [statusFilter, searchParam, currentPage, refetchTrigger]);
 
   const handleAddStudent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,19 +253,27 @@ const StudentsPage: React.FC = () => {
     const errors: Record<string, string> = {};
 
     const nameRes = validatePersonName(formData.name, "Student name");
-    if (!nameRes.isValid) errors.name = nameRes.error || "Invalid student name.";
+    if (!nameRes.isValid)
+      errors.name = nameRes.error || "Invalid student name.";
 
     const idRes = validateRequired(formData.studentId, "Student ID");
-    if (!idRes.isValid) errors.studentId = idRes.error || "Student ID is required.";
+    if (!idRes.isValid)
+      errors.studentId = idRes.error || "Student ID is required.";
 
     const emailRes = validateEmail(formData.email);
-    if (!emailRes.isValid) errors.email = emailRes.error || "Invalid email address.";
+    if (!emailRes.isValid)
+      errors.email = emailRes.error || "Invalid email address.";
 
     const phoneRes = validatePakistaniMobileNumber(formData.phone);
-    if (!phoneRes.isValid) errors.phone = phoneRes.error || "Invalid phone number.";
+    if (!phoneRes.isValid)
+      errors.phone = phoneRes.error || "Invalid phone number.";
 
-    const guardianRes = validatePersonName(formData.guardianName, "Guardian name");
-    if (!guardianRes.isValid) errors.guardianName = guardianRes.error || "Invalid guardian name.";
+    const guardianRes = validatePersonName(
+      formData.guardianName,
+      "Guardian name",
+    );
+    if (!guardianRes.isValid)
+      errors.guardianName = guardianRes.error || "Invalid guardian name.";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -110,9 +286,16 @@ const StudentsPage: React.FC = () => {
       name: formData.name.trim(),
       email: formData.email.trim(),
       isVerified: true,
+      userId: `USR-${Date.now()}`,
+      dateOfBirth: "",
+      gender: "Not specified",
+      address: "",
+      guardianName: formData.guardianName.trim(),
+      guardianPhone: formData.phone.trim(),
     };
 
     setStudents([newStudent, ...students]);
+    setTotalItems((prev) => prev + 1);
     setFormData({
       name: "",
       studentId: "",
@@ -151,33 +334,6 @@ const StudentsPage: React.FC = () => {
         </button>
       </section>
 
-      {/* KPI Metrics */}
-      {/* <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        {metrics.map((m) => {
-          const Icon = m.icon;
-          return (
-            <div
-              key={m.label}
-              className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-500 truncate">
-                  {m.label}
-                </span>
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center border shrink-0 ${m.color}`}
-                >
-                  <Icon size={14} />
-                </div>
-              </div>
-              <p className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                {m.value}
-              </p>
-            </div>
-          );
-        })}
-      </section> */}
-
       {/* Search & Filter Toolbar */}
       <section className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search Input */}
@@ -196,7 +352,10 @@ const StudentsPage: React.FC = () => {
           {search && (
             <button
               type="button"
-              onClick={() => setSearch("")}
+              onClick={() => {
+                setSearch("");
+                updateUrlParams({ search: "", page: 1 });
+              }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
               title="Clear search"
             >
@@ -205,14 +364,14 @@ const StudentsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Status Filter Tabs & Class Dropdown */}
+        {/* Status Filter Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
           <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
             {(["All", "Active", "Inactive"] as const).map((status) => (
               <button
                 key={status}
                 type="button"
-                onClick={() => setStatusFilter(status)}
+                onClick={() => updateUrlParams({ status, page: 1 })}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   statusFilter === status
                     ? "bg-white text-slate-900 shadow-xs"
@@ -233,17 +392,24 @@ const StudentsPage: React.FC = () => {
           <span>
             Showing{" "}
             <strong className="text-slate-800 font-semibold">
-              {students?.length}
+              {totalItems > 0 ? (currentPage - 1) * LIMIT + 1 : 0}
+            </strong>{" "}
+            to{" "}
+            <strong className="text-slate-800 font-semibold">
+              {Math.min(currentPage * LIMIT, totalItems)}
+            </strong>{" "}
+            of{" "}
+            <strong className="text-slate-800 font-semibold">
+              {totalItems}
             </strong>{" "}
             students
           </span>
-          {statusFilter !== "All" || classFilter !== "All" || search ? (
+          {statusFilter !== "All" || searchParam ? (
             <button
               type="button"
               onClick={() => {
-                setStatusFilter("All");
-                setClassFilter("All");
                 setSearch("");
+                updateUrlParams({ status: "All", search: "", page: 1 });
               }}
               className="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer"
             >
@@ -257,7 +423,6 @@ const StudentsPage: React.FC = () => {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Student ID</th>
                 <th className="py-3 px-5">Student Name</th>
                 <th className="py-3 px-4"> Email</th>
                 {/* <th className="py-3 px-4">Class & Sec</th> */}
@@ -292,11 +457,6 @@ const StudentsPage: React.FC = () => {
                     key={student.id}
                     className="hover:bg-slate-50/80 transition-colors group"
                   >
-                     <td className="py-3.5 px-4 text-xs font-mono font-medium text-slate-600">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                        {student?.id}
-                      </span>
-                    </td>
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 text-violet-700 font-bold text-xs flex items-center justify-center shrink-0">
@@ -309,7 +469,7 @@ const StudentsPage: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                   
+
                     <td className="py-3.5 px-4 text-xs font-medium text-slate-600">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1.5 text-slate-700">
@@ -318,12 +478,31 @@ const StudentsPage: React.FC = () => {
                             {student?.email}
                           </span>
                         </div>
-                        
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4">
                       {statusBadge(student?.isVerified ? "Active" : "Inactive")}
+                    </td>
+                    <td className="py-3.5 px-5 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/students/${student.id}`)}
+                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                          title="View Details Page"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteStudent(student.id)}
+                          className="p-1.5  text-rose-500 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Student"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -379,6 +558,17 @@ const StudentsPage: React.FC = () => {
             ))
           )}
         </div>
+
+        {/* Reusable Pagination */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          limit={LIMIT}
+          itemLabel="students"
+          onPageChange={(page) => updateUrlParams({ page })}
+          disabled={isLoading}
+        />
       </section>
 
       {/* Add Student Modal */}
@@ -388,8 +578,12 @@ const StudentsPage: React.FC = () => {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Add New Student</h3>
-                <p className="text-xs text-slate-500">Register a new pupil profile with verified records</p>
+                <h3 className="text-base font-bold text-slate-900">
+                  Add New Student
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Register a new pupil profile with verified records
+                </p>
               </div>
               <button
                 type="button"
@@ -401,7 +595,11 @@ const StudentsPage: React.FC = () => {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleAddStudent} noValidate className="p-6 space-y-4">
+            <form
+              onSubmit={handleAddStudent}
+              noValidate
+              className="p-6 space-y-4"
+            >
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">
                   Student Full Name *
@@ -412,7 +610,8 @@ const StudentsPage: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => {
                     setFormData({ ...formData, name: e.target.value });
-                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: "" }));
+                    if (fieldErrors.name)
+                      setFieldErrors((prev) => ({ ...prev, name: "" }));
                   }}
                   className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                     fieldErrors.name
@@ -438,7 +637,8 @@ const StudentsPage: React.FC = () => {
                   value={formData.studentId}
                   onChange={(e) => {
                     setFormData({ ...formData, studentId: e.target.value });
-                    if (fieldErrors.studentId) setFieldErrors((prev) => ({ ...prev, studentId: "" }));
+                    if (fieldErrors.studentId)
+                      setFieldErrors((prev) => ({ ...prev, studentId: "" }));
                   }}
                   className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                     fieldErrors.studentId
@@ -464,7 +664,8 @@ const StudentsPage: React.FC = () => {
                   value={formData.email}
                   onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value });
-                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: "" }));
+                    if (fieldErrors.email)
+                      setFieldErrors((prev) => ({ ...prev, email: "" }));
                   }}
                   className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                     fieldErrors.email
@@ -488,7 +689,8 @@ const StudentsPage: React.FC = () => {
                   value={formData.phone}
                   onChange={(val: string) => {
                     setFormData({ ...formData, phone: val });
-                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: "" }));
+                    if (fieldErrors.phone)
+                      setFieldErrors((prev) => ({ ...prev, phone: "" }));
                   }}
                   hasError={Boolean(fieldErrors.phone)}
                 />
@@ -510,7 +712,8 @@ const StudentsPage: React.FC = () => {
                   value={formData.guardianName}
                   onChange={(e) => {
                     setFormData({ ...formData, guardianName: e.target.value });
-                    if (fieldErrors.guardianName) setFieldErrors((prev) => ({ ...prev, guardianName: "" }));
+                    if (fieldErrors.guardianName)
+                      setFieldErrors((prev) => ({ ...prev, guardianName: "" }));
                   }}
                   className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                     fieldErrors.guardianName

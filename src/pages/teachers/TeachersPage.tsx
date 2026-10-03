@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Users,
   Search,
@@ -6,24 +7,28 @@ import {
   CheckCircle2,
   XCircle,
   X,
-  Trash2,
-  Edit2,
-  Eye,
   Mail,
+  Eye,
+  Edit2,
+  Trash2,
   AlertCircle,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import type { Teacher } from "../../types/teacher";
-import { getSchoolById } from "../../apis/school/school.api";
 import {
   validatePersonName,
   validateEmail,
-  validatePakistaniMobileNumber,
   validateRequired,
 } from "../../utils/validation";
-import PakistaniPhoneInput from "../../components/shared/PakistaniPhoneInput";
-
-const statusBadge = (status?: boolean) => {
-  if (status) {
+import {
+  getSchoolTeachers,
+  deleteSchoolTeacher,
+  addSchoolTeacher,
+} from "../../apis/school/school.api";
+import Pagination from "../../components/shared/Pagination";
+const statusBadge = (status?: string | boolean) => {
+  const isActive = status === "Active" || status === true;
+  if (isActive) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
         <CheckCircle2 size={12} className="text-emerald-500" />
@@ -48,103 +53,245 @@ const getInitials = (name: string) => {
     .join("");
 };
 
-const TeachersPage: React.FC = () => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | boolean>("All");
-  const [subjectFilter, setSubjectFilter] = useState<string>("All");
+const LIMIT = 10;
 
-  // Modal & Form State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [deleteCandidate, setDeleteCandidate] = useState<Teacher | null>(null);
-  const [viewingTeacher, setViewingTeacher] = useState<Teacher | null>(null);
+const TeachersPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read URL query parameters
+  const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
+  const statusFilter = searchParams.get("status") || "All";
+  const searchParam = searchParams.get("search") || "";
+
+  // Local state
+  const [search, setSearch] = useState(searchParam);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  const school = JSON.parse(localStorage.getItem("user") ?? "{}").schoolAdmin;
+
+  // Sync URL search params helper
+  const updateUrlParams = (newParams: {
+    page?: number;
+    status?: string;
+    search?: string;
+  }) => {
+    const nextParams = new URLSearchParams(searchParams);
+    const nextPage = newParams.page !== undefined ? newParams.page : 1;
+    nextParams.set("page", String(nextPage));
+    nextParams.set("limit", String(LIMIT));
+
+    if (newParams.status !== undefined) {
+      nextParams.set("status", newParams.status);
+    } else if (!nextParams.has("status")) {
+      nextParams.set("status", "All");
+    }
+
+    if (newParams.search !== undefined) {
+      if (newParams.search.trim()) {
+        nextParams.set("search", newParams.search.trim());
+      } else {
+        nextParams.delete("search");
+      }
+    }
+
+    setSearchParams(nextParams);
+  };
+
+  // Ensure default URL query parameters are present on initial load
+  useEffect(() => {
+    const hasPage = searchParams.has("page");
+    const hasLimit = searchParams.has("limit");
+    const hasStatus = searchParams.has("status");
+    if (!hasPage || !hasLimit || !hasStatus) {
+      const nextParams = new URLSearchParams(searchParams);
+      if (!hasPage) nextParams.set("page", "1");
+      if (!hasLimit) nextParams.set("limit", String(LIMIT));
+      if (!hasStatus) nextParams.set("status", "All");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, []);
+
+  // Sync local search input when URL search changes (e.g. back/forward navigation)
+  useEffect(() => {
+    setSearch(searchParam);
+  }, [searchParam]);
+
+  // Debounce search input to update URL params
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (search.trim() !== searchParam.trim()) {
+        updateUrlParams({ search, page: 1 });
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Add Teacher Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    id: 0,
     name: "",
     email: "",
-    phone: "",
-    subject: "",
+    qualification: "MSc",
+    employeeNumber: "",
+    specialization: "",
+    joiningDate: "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const school =
-    JSON.parse(localStorage.getItem("user") || "{}")?.schoolAdmin || null;
-  useEffect(() => {
-    const fetchStudents = async () => {
-      const response = await getSchoolById(school?.id);
-      if (response?.success) {
-        const teachersData = response?.data?.users?.filter(
-          (user: any) => user.role === "TEACHER",
-        );
-        setTeachers(teachersData || []);
-      }
-    };
-    fetchStudents();
-  }, []);
-
+  // Open Add Teacher Modal
   const openAddModal = () => {
-    setModalMode("add");
-    setFormData({ id: 0, name: "", email: "", phone: "", subject: "" });
-    setFieldErrors({});
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (teacher: Teacher) => {
-    setModalMode("edit");
     setFormData({
-      id: teacher.id,
-      name: teacher.name,
-      email: teacher.email,
-      phone: (teacher as any).phone || "",
-      subject: (teacher as any).subject || "",
+      name: "",
+      email: "",
+      employeeNumber: "",
+      qualification: "MSc",
+      specialization: "",
+      joiningDate: "",
     });
     setFieldErrors({});
-    setIsModalOpen(true);
+    setIsAddModalOpen(true);
   };
 
-  const handleTeacherSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
+  // Handle Add Teacher Form Submission
+  const handleAddTeacher = async () => {
     const errors: Record<string, string> = {};
+    if (!validatePersonName(formData.name)) {
+      errors.name = "Please enter a valid name.";
+    }
+    if (!validateEmail(formData.email)) {
+      errors.email = "Please enter a valid email address.";
+    }
+    if (!validateRequired(formData.employeeNumber)) {
+      errors.employeeNumber = "Employee number is required.";
+    }
+    if (!validateRequired(formData.qualification)) {
+      errors.qualification = "Qualification is required.";
+    }
+    if (!validateRequired(formData.specialization)) {
+      errors.specialization = "Specialization is required.";
+    }
+    if (!validateRequired(formData.joiningDate)) {
+      errors.joiningDate = "Joining date is required.";
+    }
 
-    const nameRes = validatePersonName(formData.name, "Teacher name");
-    if (!nameRes.isValid) errors.name = nameRes.error || "Invalid teacher name.";
+    setFieldErrors(errors);
 
-    const emailRes = validateEmail(formData.email);
-    if (!emailRes.isValid) errors.email = emailRes.error || "Invalid email address.";
-
-    const phoneRes = validatePakistaniMobileNumber(formData.phone);
-    if (!phoneRes.isValid) errors.phone = phoneRes.error || "Invalid phone number.";
-
-    const subjectRes = validateRequired(formData.subject, "Subject / Department");
-    if (!subjectRes.isValid) errors.subject = subjectRes.error || "Subject is required.";
-
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+    if (Object.keys(errors).length === 0) {
+      setIsAddModalOpen(false);
+    } else {
+      console.log("Form validation errors:", errors);
       return;
     }
 
-    if (modalMode === "add") {
-      const newTeacher: Teacher = {
-        id: Date.now(),
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        isVerified: true,
-      };
-      setTeachers([newTeacher, ...teachers]);
-    } else {
-      setTeachers(
-        teachers.map((t) =>
-          t.id === formData.id
-            ? { ...t, name: formData.name.trim(), email: formData.email.trim() }
-            : t
-        )
-      );
+    try {
+      const res = await addSchoolTeacher({
+        ...formData,
+        schoolId: school?.id || 1,
+      });
+      if (res?.success) {
+        toast.success(res.message || "Teacher added successfully.");
+        setIsAddModalOpen(false);
+        setRefetchTrigger((prev) => prev + 1);
+      }
+    } catch (error) {
+      toast.error("Failed to add teacher. Please try again.");
+      console.error("Error adding teacher:", error);
     }
-
-    setIsModalOpen(false);
   };
+
+  // Delete Teacher Function
+  const deleteTeacher = async (id: number) => {
+    try {
+      const schoolId = school?.id || 1;
+      const res = await deleteSchoolTeacher(schoolId, Number(id));
+      if (res?.success) {
+        toast.success(res.message || "Teacher deleted successfully.");
+        setRefetchTrigger((prev) => prev + 1);
+      }
+    } catch (error: unknown) {
+      const message =
+        error &&
+          typeof error === "object" &&
+          "response" in error &&
+          error.response &&
+          typeof error.response === "object" &&
+          "data" in error.response &&
+          error.response.data &&
+          typeof error.response.data === "object" &&
+          "message" in error.response.data &&
+          typeof error.response.data.message === "string"
+          ? error.response.data.message
+          : "Failed to delete teacher.";
+      toast.error(message);
+    }
+  };
+
+  // Fetch teachers with backend pagination, status, and search
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      setIsLoading(true);
+      try {
+        const schoolId = school?.id || 1;
+        const response = await getSchoolTeachers(schoolId, {
+          status: statusFilter,
+          search: searchParam,
+          page: currentPage,
+          limit: LIMIT,
+        });
+
+        if (response?.success) {
+          const rawData = response;
+          let list: Teacher[] = [];
+
+          if (Array.isArray(rawData)) {
+            list = rawData;
+          } else if (rawData && typeof rawData === "object") {
+            const possibleList =
+              rawData.teachers || rawData.items || rawData.data || [];
+            list = Array.isArray(possibleList) ? possibleList : [];
+          }
+
+          const rawTotal = response?.pagination?.total;
+
+          const rawTotalPages = response?.pagination?.totalPages;
+
+          // If backend returned more than LIMIT items in one call (fallback client-side pagination)
+          if (list.length > LIMIT) {
+            const actualTotal = rawTotal ?? list.length;
+            setTotalItems(actualTotal);
+            setTotalPages(Math.max(1, Math.ceil(actualTotal / LIMIT)));
+            const startIndex = (currentPage - 1) * LIMIT;
+            setTeachers(list.slice(startIndex, startIndex + LIMIT));
+          } else {
+            const actualTotal =
+              rawTotal ??
+              (currentPage === 1
+                ? list.length
+                : (currentPage - 1) * LIMIT + list.length);
+            const calculatedPages =
+              rawTotalPages ?? Math.max(1, Math.ceil(actualTotal / LIMIT));
+            setTotalItems(actualTotal);
+            setTotalPages(calculatedPages);
+            setTeachers(list);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching teachers:", error);
+        setTeachers([]);
+        setTotalItems(0);
+        setTotalPages(1);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeachers();
+  }, [statusFilter, searchParam, currentPage, refetchTrigger]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
@@ -180,7 +327,7 @@ const TeachersPage: React.FC = () => {
           />
           <input
             type="text"
-            placeholder="Search by name, email, or subject..."
+            placeholder="Search by name, email, subject, or department..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
@@ -188,7 +335,10 @@ const TeachersPage: React.FC = () => {
           {search && (
             <button
               type="button"
-              onClick={() => setSearch("")}
+              onClick={() => {
+                setSearch("");
+                updateUrlParams({ search: "", page: 1 });
+              }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
               title="Clear search"
             >
@@ -197,23 +347,18 @@ const TeachersPage: React.FC = () => {
           )}
         </div>
 
-        {/* Status Filter Tabs & Subject Dropdown */}
+        {/* Status Filter Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
           <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
             {(["All", "Active", "Inactive"] as const).map((status) => (
               <button
                 key={status}
                 type="button"
-                onClick={() =>
-                  setStatusFilter(
-                    status === "All" ? "All" : status === "Active",
-                  )
-                }
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  statusFilter === status
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
+                onClick={() => updateUrlParams({ status, page: 1 })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${statusFilter === status
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+                  }`}
               >
                 {status}
               </button>
@@ -229,17 +374,24 @@ const TeachersPage: React.FC = () => {
           <span>
             Showing{" "}
             <strong className="text-slate-800 font-semibold">
-              {teachers?.length}
+              {totalItems > 0 ? (currentPage - 1) * LIMIT + 1 : 0}
+            </strong>{" "}
+            to{" "}
+            <strong className="text-slate-800 font-semibold">
+              {Math.min(currentPage * LIMIT, totalItems)}
+            </strong>{" "}
+            of{" "}
+            <strong className="text-slate-800 font-semibold">
+              {totalItems}
             </strong>{" "}
             teachers
           </span>
-          {statusFilter !== "All" || subjectFilter !== "All" || search ? (
+          {statusFilter !== "All" || searchParam ? (
             <button
               type="button"
               onClick={() => {
-                setStatusFilter("All");
-                setSubjectFilter("All");
                 setSearch("");
+                updateUrlParams({ status: "All", search: "", page: 1 });
               }}
               className="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer"
             >
@@ -250,7 +402,7 @@ const TeachersPage: React.FC = () => {
 
         {/* Desktop View Table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[760px]">
+          <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="py-3 px-5">Name</th>
@@ -284,23 +436,17 @@ const TeachersPage: React.FC = () => {
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
-                          {getInitials(teacher.name)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900 text-sm leading-tight">
-                            {teacher.name}
-                          </p>
+                          {getInitials(teacher?.name)}
                         </div>
                       </div>
                     </td>
+
                     <td className="py-3.5 px-4 text-xs font-medium text-slate-600">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5 text-slate-700">
-                          <Mail size={12} className="text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[170px]">
-                            {teacher.email}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        <Mail size={12} className="text-slate-400 shrink-0" />
+                        <span className="truncate max-w-[170px]">
+                          {teacher?.email}
+                        </span>
                       </div>
                     </td>
 
@@ -311,27 +457,18 @@ const TeachersPage: React.FC = () => {
                       <div className="inline-flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setViewingTeacher(teacher)}
+                          onClick={() => navigate(`/teachers/${teacher.id}`)}
                           className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                          title="View Details"
+                          title="View Details Page"
                         >
                           <Eye size={15} />
                         </button>
                         <button
                           type="button"
-                          onClick={() => openEditModal(teacher)}
-                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Teacher"
+                          onClick={() => deleteTeacher(teacher?.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold cursor-pointer"
                         >
-                          <Edit2 size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteCandidate(teacher)}
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Teacher"
-                        >
-                          <Trash2 size={15} />
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </td>
@@ -351,63 +488,91 @@ const TeachersPage: React.FC = () => {
             </div>
           ) : (
             teachers?.map((teacher) => (
-              <div key={teacher.id} className="p-4 space-y-3">
+              <div key={teacher?.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
-                      {getInitials(teacher.name)}
+                      {getInitials(teacher?.name)}
                     </div>
                     <div>
                       <p className="font-semibold text-slate-900 text-sm">
-                        {teacher.name}
+                        {teacher?.name}
                       </p>
-                      <p className="text-xs text-slate-500">{teacher.email}</p>
                     </div>
                   </div>
                   {statusBadge(teacher?.isVerified)}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                <div className="bg-slate-50 rounded-xl p-3 text-xs space-y-1.5 text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Email:</span>
+                    <span className="text-slate-700 truncate max-w-[190px]">
+                      {teacher.email}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mobile Actions: View, Edit, Delete */}
+                <div className="flex items-center justify-end gap-1 pt-1 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => openEditModal(teacher)}
-                    className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-semibold"
+                    onClick={() => navigate(`/teachers/${teacher.id}`)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs font-semibold cursor-pointer"
                   >
-                    Edit
+                    <Eye size={13} />
+                    <span>View</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDeleteCandidate(teacher)}
-                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold"
+                    // onClick={() => setEditingTeacher(teacher)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-semibold cursor-pointer"
                   >
-                    Delete
+                    <Edit2 size={13} />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteTeacher(teacher?.id)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete</span>
                   </button>
                 </div>
               </div>
             ))
           )}
         </div>
+
+        {/* Reusable Pagination */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          limit={LIMIT}
+          itemLabel="teachers"
+          onPageChange={(page) => updateUrlParams({ page })}
+          disabled={isLoading}
+        />
       </section>
 
-      {/* Add / Edit Teacher Modal */}
-      {isModalOpen && (
+      {/* Add Teacher Modal */}
+      {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-100">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  {modalMode === "add" ? "Add New Teacher" : "Edit Teacher Profile"}
+                  Add New Teacher
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {modalMode === "add"
-                    ? "Register an academic faculty member into the institution"
-                    : "Update instructor records and departmental details"}
+                  Register an academic faculty member into the institution
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => setIsAddModalOpen(false)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
@@ -415,7 +580,11 @@ const TeachersPage: React.FC = () => {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleTeacherSubmit} noValidate className="p-6 space-y-4">
+            <form
+              onSubmit={handleAddTeacher}
+              noValidate
+              className="p-6 space-y-4 overflow-y-auto"
+            >
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">
                   Teacher Full Name *
@@ -426,13 +595,13 @@ const TeachersPage: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => {
                     setFormData({ ...formData, name: e.target.value });
-                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: "" }));
+                    if (fieldErrors.name)
+                      setFieldErrors((prev) => ({ ...prev, name: "" }));
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                    fieldErrors.name
-                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
-                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  }`}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.name
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
                 {fieldErrors.name && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
@@ -452,13 +621,13 @@ const TeachersPage: React.FC = () => {
                   value={formData.email}
                   onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value });
-                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: "" }));
+                    if (fieldErrors.email)
+                      setFieldErrors((prev) => ({ ...prev, email: "" }));
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                    fieldErrors.email
-                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
-                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  }`}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.email
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
                 {fieldErrors.email && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
@@ -470,55 +639,129 @@ const TeachersPage: React.FC = () => {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">
-                  Pakistani Mobile Number *
+                  Employee Number *
                 </label>
-                <PakistaniPhoneInput
-                  value={formData.phone}
-                  onChange={(val: string) => {
-                    setFormData({ ...formData, phone: val });
-                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: "" }));
+                <input
+                  type="text"
+                  placeholder="e.g. EMP12345"
+                  value={formData.employeeNumber}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      employeeNumber: e.target.value,
+                    });
+                    if (fieldErrors.employeeNumber)
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        employeeNumber: "",
+                      }));
                   }}
-                  hasError={Boolean(fieldErrors.phone)}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.employeeNumber
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
-                {fieldErrors.phone && (
+                {fieldErrors.employeeNumber && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
                     <AlertCircle size={12} className="shrink-0" />
-                    <span>{fieldErrors.phone}</span>
+                    <span>{fieldErrors.employeeNumber}</span>
                   </p>
                 )}
               </div>
 
+              {/* Additional form fields for qualification, specialization, joining date can be added here */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">
-                  Subject / Department *
+                  Qualification *
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Mathematics"
-                  value={formData.subject}
+                  placeholder="e.g. MSc in Computer Science"
+                  value={formData.qualification}
                   onChange={(e) => {
-                    setFormData({ ...formData, subject: e.target.value });
-                    if (fieldErrors.subject) setFieldErrors((prev) => ({ ...prev, subject: "" }));
+                    setFormData({ ...formData, qualification: e.target.value });
+                    if (fieldErrors.qualification)
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        qualification: "",
+                      }));
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                    fieldErrors.subject
-                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
-                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  }`}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.qualification
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
-                {fieldErrors.subject && (
+                {fieldErrors.qualification && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
                     <AlertCircle size={12} className="shrink-0" />
-                    <span>{fieldErrors.subject}</span>
+                    <span>{fieldErrors.qualification}</span>
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Specialization *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Artificial Intelligence"
+                  value={formData.specialization}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      specialization: e.target.value,
+                    });
+                    if (fieldErrors.specialization)
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        specialization: "",
+                      }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.specialization
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
+                />
+                {fieldErrors.specialization && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.specialization}</span>
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Joining Date *
+                </label>
+                <input
+                  type="date"
+                  value={formData.joiningDate}
+                  onChange={(e) => {
+                    setFormData({ ...formData, joiningDate: e.target.value });
+                    if (fieldErrors.joiningDate)
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        joiningDate: "",
+                      }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.joiningDate
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
+                />
+                {fieldErrors.joiningDate && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.joiningDate}</span>
                   </p>
                 )}
               </div>
 
               {/* Modal Actions */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => setIsAddModalOpen(false)}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
@@ -527,92 +770,10 @@ const TeachersPage: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-xs shadow-indigo-600/30 cursor-pointer"
                 >
-                  {modalMode === "add" ? "Save Teacher" : "Update Profile"}
+                  Save Teacher
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-100">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100">
-              <Trash2 size={24} />
-            </div>
-            <div className="text-center space-y-1">
-              <h3 className="text-base font-bold text-slate-900">Remove Teacher?</h3>
-              <p className="text-xs text-slate-500">
-                Are you sure you want to remove <strong className="text-slate-800">{deleteCandidate.name}</strong> from the faculty directory?
-              </p>
-            </div>
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteCandidate(null)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTeachers(teachers.filter((t) => t.id !== deleteCandidate.id));
-                  setDeleteCandidate(null);
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs shadow-rose-600/30 cursor-pointer"
-              >
-                Confirm Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View Teacher Details Modal */}
-      {viewingTeacher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-100">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900">Teacher Details</h3>
-              <button
-                type="button"
-                onClick={() => setViewingTeacher(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex items-center gap-3 py-2">
-              <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-base flex items-center justify-center shrink-0">
-                {getInitials(viewingTeacher.name)}
-              </div>
-              <div>
-                <p className="font-bold text-slate-900 text-base">{viewingTeacher.name}</p>
-                <p className="text-xs text-slate-500">{viewingTeacher.email}</p>
-              </div>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Status</span>
-                <span>{statusBadge(viewingTeacher.isVerified)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Record ID</span>
-                <span className="font-mono text-slate-800">{viewingTeacher.id}</span>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setViewingTeacher(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}
