@@ -48,11 +48,15 @@ export const deleteSchoolTeacher = async (schoolId: number, teacherId: number) =
 }
 export const deleteSchoolStudent = async (schoolId: number, studentId: number) => {
   const response = await api.delete(`school/students/${studentId}`, {
-    params: { schoolId: schoolId }, 
+    params: { schoolId: schoolId },
   });
   return response.data;
 }
 export const addSchoolTeacher = async (teacherData: any) => {
   const response = await api.post(`school/teachers`, teacherData);
+  return response.data;
+}
+export const addSchoolStudent = async (studentData: any) => {
+  const response = await api.post(`school/students`, studentData);
   return response.data;
 }

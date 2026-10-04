@@ -45,8 +45,15 @@ const StudentDetailPage = () => {
     };
     fetchStudentDetails();
   }, []);
-  
 
+  const dateFormatter = (date: string) => {
+    const d = new Date(date);
+    return d.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="mx-auto max-w-6xl">
@@ -89,7 +96,7 @@ const StudentDetailPage = () => {
                 </h2>
 
                 <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                  {student?.isVerified  ? "Active" : "Inactive"}
+                  {student?.isVerified ? "Active" : "Inactive"}
                 </span>
               </div>
 
@@ -113,7 +120,7 @@ const StudentDetailPage = () => {
 
               <Info
                 label="Date of Birth"
-                value={student?.dateOfBirth ?? "N/A"}
+                value={student?.dateOfBirth ? dateFormatter(student?.dateOfBirth) : "N/A"}
                 icon={<Calendar size={16} />}
               />
 
@@ -139,7 +146,7 @@ const StudentDetailPage = () => {
 
 
 
-              <Info label="Status" value={student?.isVerified  ? "Active" : "Inactive"} />
+              <Info label="Status" value={student?.isVerified ? "Active" : "Inactive"} />
             </div>
           </div>
 

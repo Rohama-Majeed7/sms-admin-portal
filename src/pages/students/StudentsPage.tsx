@@ -11,8 +11,9 @@ import {
   Eye,
   Trash2,
 } from "lucide-react";
-import type { Student, StudentStatus } from "../../types/student";
+import type { StudentStatus } from "../../types/student";
 import {
+  addSchoolStudent,
   deleteSchoolStudent,
   getSchoolStudents,
 } from "../../apis/school/school.api";
@@ -20,7 +21,6 @@ import {
   validatePersonName,
   validateEmail,
   validatePakistaniMobileNumber,
-  validateRequired,
 } from "../../utils/validation";
 import PakistaniPhoneInput from "../../components/shared/PakistaniPhoneInput";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -66,7 +66,7 @@ const StudentsPage: React.FC = () => {
 
   // Local state
   const [search, setSearch] = useState(searchParam);
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [totalItems, setTotalItems] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -82,6 +82,7 @@ const StudentsPage: React.FC = () => {
     search?: string;
   }) => {
     const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("gender");
     const nextPage = newParams.page !== undefined ? newParams.page : 1;
     nextParams.set("page", String(nextPage));
     nextParams.set("limit", String(LIMIT));
@@ -108,11 +109,13 @@ const StudentsPage: React.FC = () => {
     const hasPage = searchParams.has("page");
     const hasLimit = searchParams.has("limit");
     const hasStatus = searchParams.has("status");
-    if (!hasPage || !hasLimit || !hasStatus) {
+    const hasGender = searchParams.has("gender");
+    if (!hasPage || !hasLimit || !hasStatus || hasGender) {
       const nextParams = new URLSearchParams(searchParams);
       if (!hasPage) nextParams.set("page", "1");
       if (!hasLimit) nextParams.set("limit", String(LIMIT));
       if (!hasStatus) nextParams.set("status", "All");
+      if (hasGender) nextParams.delete("gender");
       setSearchParams(nextParams, { replace: true });
     }
   }, []);
@@ -134,14 +137,27 @@ const StudentsPage: React.FC = () => {
 
   // Add Student Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    studentId: "",
     email: "",
-    phone: "",
     guardianName: "",
+    guardianPhone: "",
+    address: "",
+    dateOfBirth: "",
+    gender: "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const isFormFilled = Boolean(
+    formData.name.trim() &&
+    formData.email.trim() &&
+    formData.guardianPhone.trim() &&
+    formData.guardianName.trim() &&
+    formData.address.trim() &&
+    ["MALE", "FEMALE", "OTHER"].includes(formData.gender) &&
+    formData.dateOfBirth
+  );
 
   const deleteStudent = async (id: number) => {
     try {
@@ -154,15 +170,15 @@ const StudentsPage: React.FC = () => {
     } catch (error: unknown) {
       const message =
         error &&
-        typeof error === "object" &&
-        "response" in error &&
-        error.response &&
-        typeof error.response === "object" &&
-        "data" in error.response &&
-        error.response.data &&
-        typeof error.response.data === "object" &&
-        "message" in error.response.data &&
-        typeof error.response.data.message === "string"
+          typeof error === "object" &&
+          "response" in error &&
+          error.response &&
+          typeof error.response === "object" &&
+          "data" in error.response &&
+          error.response.data &&
+          typeof error.response.data === "object" &&
+          "message" in error.response.data &&
+          typeof error.response.data.message === "string"
           ? error.response.data.message
           : "Failed to delete student.";
       toast.error(message);
@@ -182,16 +198,26 @@ const StudentsPage: React.FC = () => {
           limit: LIMIT,
         });
 
+        console.log("Students API response:", response);
+
         if (response?.success) {
           const rawData = response?.data;
-          let list: Student[] = [];
+          let list: any[] = [];
 
           if (Array.isArray(rawData)) {
             list = rawData;
+          } else if (Array.isArray(response?.students)) {
+            list = response.students;
           } else if (rawData && typeof rawData === "object") {
-            const possibleList =
-              rawData.students || rawData.items || rawData.data || [];
-            list = Array.isArray(possibleList) ? possibleList : [];
+            if (Array.isArray(rawData.students)) {
+              list = rawData.students;
+            } else if (Array.isArray(rawData.items)) {
+              list = rawData.items;
+            } else if (Array.isArray(rawData.data)) {
+              list = rawData.data;
+            } else if (rawData.id) {
+              list = [rawData];
+            }
           }
 
           const rawTotal =
@@ -247,8 +273,13 @@ const StudentsPage: React.FC = () => {
     fetchStudents();
   }, [statusFilter, searchParam, currentPage, refetchTrigger]);
 
-  const handleAddStudent = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddStudent = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+
+    if (!isFormFilled) {
+      toast.warning("Please fill in all required fields.");
+      return;
+    }
 
     const errors: Record<string, string> = {};
 
@@ -256,17 +287,13 @@ const StudentsPage: React.FC = () => {
     if (!nameRes.isValid)
       errors.name = nameRes.error || "Invalid student name.";
 
-    const idRes = validateRequired(formData.studentId, "Student ID");
-    if (!idRes.isValid)
-      errors.studentId = idRes.error || "Student ID is required.";
-
     const emailRes = validateEmail(formData.email);
     if (!emailRes.isValid)
       errors.email = emailRes.error || "Invalid email address.";
 
-    const phoneRes = validatePakistaniMobileNumber(formData.phone);
+    const phoneRes = validatePakistaniMobileNumber(formData.guardianPhone);
     if (!phoneRes.isValid)
-      errors.phone = phoneRes.error || "Invalid phone number.";
+      errors.guardianPhone = phoneRes.error || "Invalid phone number.";
 
     const guardianRes = validatePersonName(
       formData.guardianName,
@@ -275,36 +302,50 @@ const StudentsPage: React.FC = () => {
     if (!guardianRes.isValid)
       errors.guardianName = guardianRes.error || "Invalid guardian name.";
 
+    if (!formData.gender || !["MALE", "FEMALE", "OTHER"].includes(formData.gender)) {
+      errors.gender = "Gender is required.";
+    }
+    if (!formData.dateOfBirth) {
+      errors.dateOfBirth = "Date of birth is required.";
+    }
+    if (!formData.address.trim()) {
+      errors.address = "Address is required.";
+    }
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
     }
 
-    const newStudent: Student = {
-      id: Date.now(),
-      studentId: formData.studentId.trim(),
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      isVerified: true,
-      userId: `USR-${Date.now()}`,
-      dateOfBirth: "",
-      gender: "Not specified",
-      address: "",
-      guardianName: formData.guardianName.trim(),
-      guardianPhone: formData.phone.trim(),
-    };
-
-    setStudents([newStudent, ...students]);
-    setTotalItems((prev) => prev + 1);
-    setFormData({
-      name: "",
-      studentId: "",
-      email: "",
-      phone: "",
-      guardianName: "",
-    });
-    setFieldErrors({});
-    setIsAddModalOpen(false);
+    try {
+      setIsSubmitting(true);
+      const res = await addSchoolStudent({ ...formData, schoolId: school?.id });
+      if (res?.success) {
+        toast.success(res?.message || "Student added successfully.");
+        setRefetchTrigger((prev) => prev + 1);
+        setFormData({
+          name: "",
+          email: "",
+          guardianName: "",
+          address: "",
+          dateOfBirth: "",
+          gender: "",
+          guardianPhone: "",
+        });
+        setFieldErrors({});
+        setIsAddModalOpen(false);
+      } else {
+        toast.error(res?.message || "Failed to add student.");
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to add student.";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -372,11 +413,10 @@ const StudentsPage: React.FC = () => {
                 key={status}
                 type="button"
                 onClick={() => updateUrlParams({ status, page: 1 })}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  statusFilter === status
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${statusFilter === status
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+                  }`}
               >
                 {status}
               </button>
@@ -596,7 +636,10 @@ const StudentsPage: React.FC = () => {
 
             {/* Modal Form */}
             <form
-              onSubmit={handleAddStudent}
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddStudent();
+              }}
               noValidate
               className="p-6 space-y-4"
             >
@@ -613,43 +656,15 @@ const StudentsPage: React.FC = () => {
                     if (fieldErrors.name)
                       setFieldErrors((prev) => ({ ...prev, name: "" }));
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                    fieldErrors.name
-                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
-                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  }`}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.name
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
                 {fieldErrors.name && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
                     <AlertCircle size={12} className="shrink-0" />
                     <span>{fieldErrors.name}</span>
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Student ID / Roll No *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. STU-2024-001"
-                  value={formData.studentId}
-                  onChange={(e) => {
-                    setFormData({ ...formData, studentId: e.target.value });
-                    if (fieldErrors.studentId)
-                      setFieldErrors((prev) => ({ ...prev, studentId: "" }));
-                  }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                    fieldErrors.studentId
-                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
-                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  }`}
-                />
-                {fieldErrors.studentId && (
-                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
-                    <AlertCircle size={12} className="shrink-0" />
-                    <span>{fieldErrors.studentId}</span>
                   </p>
                 )}
               </div>
@@ -667,11 +682,10 @@ const StudentsPage: React.FC = () => {
                     if (fieldErrors.email)
                       setFieldErrors((prev) => ({ ...prev, email: "" }));
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                    fieldErrors.email
-                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
-                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  }`}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.email
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
                 {fieldErrors.email && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
@@ -683,28 +697,131 @@ const StudentsPage: React.FC = () => {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">
-                  Pakistani Mobile Number *
+                  Date of Birth *
                 </label>
-                <PakistaniPhoneInput
-                  value={formData.phone}
-                  onChange={(val: string) => {
-                    setFormData({ ...formData, phone: val });
-                    if (fieldErrors.phone)
-                      setFieldErrors((prev) => ({ ...prev, phone: "" }));
+                <input
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => {
+                    setFormData({ ...formData, dateOfBirth: e.target.value });
+                    if (fieldErrors.dateOfBirth)
+                      setFieldErrors((prev) => ({ ...prev, dateOfBirth: "" }));
                   }}
-                  hasError={Boolean(fieldErrors.phone)}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.dateOfBirth
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
-                {fieldErrors.phone && (
+                {fieldErrors.dateOfBirth && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
                     <AlertCircle size={12} className="shrink-0" />
-                    <span>{fieldErrors.phone}</span>
+                    <span>{fieldErrors.dateOfBirth}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Gender *</label>
+                <div className="flex flex-wrap gap-6 sm:gap-8 items-center pt-1">
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="MALE"
+                      checked={formData.gender === "MALE"}
+                      onChange={(e) => {
+                        setFormData({ ...formData, gender: e.target.value });
+                        if (fieldErrors.gender)
+                          setFieldErrors((prev) => ({ ...prev, gender: "" }));
+                      }}
+                      className="accent-indigo-600 cursor-pointer"
+                    />
+                    Male
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="FEMALE"
+                      checked={formData.gender === "FEMALE"}
+                      onChange={(e) => {
+                        setFormData({ ...formData, gender: e.target.value });
+                        if (fieldErrors.gender)
+                          setFieldErrors((prev) => ({ ...prev, gender: "" }));
+                      }}
+                      className="accent-indigo-600 cursor-pointer"
+                    />
+                    Female
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="OTHER"
+                      checked={formData.gender === "OTHER"}
+                      onChange={(e) => {
+                        setFormData({ ...formData, gender: e.target.value });
+                        if (fieldErrors.gender)
+                          setFieldErrors((prev) => ({ ...prev, gender: "" }));
+                      }}
+                      className="accent-indigo-600 cursor-pointer"
+                    />
+                    Other
+                  </label>
+                </div>
+                {fieldErrors.gender && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.gender}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Address *</label>
+                <input type="text" placeholder="Enter Address" value={formData.address}
+                  onChange={(e) => {
+                    setFormData({ ...formData, address: e.target.value });
+                    if (fieldErrors.address)
+                      setFieldErrors((prev) => ({ ...prev, address: "" }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.address
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
+                />
+                {fieldErrors.address && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.address}</span>
                   </p>
                 )}
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">
-                  Parent / Guardian Name *
+                  Guardian Contact Number *
+                </label>
+                <PakistaniPhoneInput
+                  value={formData.guardianPhone}
+                  onChange={(val: string) => {
+                    setFormData({ ...formData, guardianPhone: val });
+                    if (fieldErrors.guardianPhone)
+                      setFieldErrors((prev) => ({ ...prev, guardianPhone: "" }));
+                  }}
+                  hasError={Boolean(fieldErrors.guardianPhone)}
+                />
+                {fieldErrors.guardianPhone && (
+                  <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{fieldErrors.guardianPhone}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Guardian Name *
                 </label>
                 <input
                   type="text"
@@ -715,11 +832,10 @@ const StudentsPage: React.FC = () => {
                     if (fieldErrors.guardianName)
                       setFieldErrors((prev) => ({ ...prev, guardianName: "" }));
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                    fieldErrors.guardianName
-                      ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
-                      : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  }`}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 transition-all ${fieldErrors.guardianName
+                    ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/10"
+                    : "border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    }`}
                 />
                 {fieldErrors.guardianName && (
                   <p className="text-xs text-rose-500 flex items-center gap-1 mt-1">
@@ -733,16 +849,21 @@ const StudentsPage: React.FC = () => {
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setFieldErrors({});
+                  }}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-xs shadow-indigo-600/30 cursor-pointer"
+                  type="button"
+                  onClick={handleAddStudent}
+                  disabled={!isFormFilled || isSubmitting}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold shadow-xs shadow-indigo-600/30 cursor-pointer transition-all"
                 >
-                  Save Student
+                  {isSubmitting ? "Saving..." : "Save Student"}
                 </button>
               </div>
             </form>
