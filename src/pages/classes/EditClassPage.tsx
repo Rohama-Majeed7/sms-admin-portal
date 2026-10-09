@@ -27,7 +27,7 @@ import type {
 } from "../../types/class";
 import type { Teacher } from "../../types/teacher";
 
-import { updateClass, getClassById, deleteClassSection, publishClass, getAllClasses } from "../../apis/class/api.class";
+import { updateClass, getClassById, deleteClassSection, publishClass, getAllClasses, deleteClassSubject } from "../../apis/class/api.class";
 import { getSchoolTeachers } from "../../apis/school/school.api";
 
 // Quick suggestion chips for class names
@@ -39,7 +39,6 @@ const CLASS_NAME_SUGGESTIONS = [
   "Grade 6",
   "Grade 5",
   "Matriculation",
-  "O-Levels Prep",
 ];
 
 // Quick suggestion chips for common curriculum subjects
@@ -418,11 +417,23 @@ const EditClassPage: React.FC = () => {
     toast.success(`Added ${name}`);
   };
 
-  const handleRemoveSubject = (subId: string | number) => {
-    const sub = subjects.find((s) => s.id === subId);
-    setSubjects((prev) => prev.filter((s) => s.id !== subId));
-    setIsStep3Saved(false);
-    toast.info(`Removed ${sub?.name || "subject"}`);
+  const handleRemoveSubject = async (subjectId: string | number, subjectName?: string) => {
+
+    if (!subjectId) {
+      setSubjects((prev) => prev.filter((s) => s.name !== subjectName));
+      toast.info("Subject removed");
+      return;
+    }
+    try {
+      const res = await deleteClassSubject(Number(id), Number(subjectId));
+      if (res?.success) {
+        setIsStep3Saved(false);
+        toast.success(res?.message || "Subject removed successfully!");
+        setTrigger((prev) => prev + 1);
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to remove subject");
+    }
   };
   const handleSaveSubjectChanges = async () => {
     if (subjects.length === 0) {
@@ -698,16 +709,12 @@ const EditClassPage: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
               Edit Class: <span className="text-indigo-600">{className}</span>
             </h1>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-              <School size={12} />
-              School ID: #{schoolId}
-            </span>
+
             <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+              <School size={12} />
               {schoolName}
             </span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
-              Class ID: #{id}
-            </span>
+
             <span
               className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${isPublished
                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
@@ -905,9 +912,7 @@ const EditClassPage: React.FC = () => {
                     className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
                     required
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Primary name displayed across attendance registers, classes, and student enrollments.
-                  </p>
+
                 </div>
 
                 {/* Quick Suggestion Pills */}
@@ -1139,11 +1144,7 @@ const EditClassPage: React.FC = () => {
                                 <UserCheck size={12} className="text-violet-600" />
                                 Section Incharge:
                               </span>
-                              {inchargeId ? (
-                                <span className="font-mono text-[10px] text-slate-400">
-                                  ID: #{inchargeId}
-                                </span>
-                              ) : null}
+
                             </div>
 
                             {inchargeId ? (
@@ -1361,7 +1362,7 @@ const EditClassPage: React.FC = () => {
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleRemoveSubject(sub.id ?? "")}
+                          onClick={() => handleRemoveSubject(sub.id || "", sub.name)}
                           className="p-1 text-slate-400 hover:text-rose-600 rounded-md transition-colors cursor-pointer shrink-0"
                           title="Remove subject"
                         >
@@ -1375,7 +1376,7 @@ const EditClassPage: React.FC = () => {
 
               {/* Step Navigation Buttons */}
               <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                {isDraft ? (
+                {isDraft && (
                   <button
                     type="button"
                     onClick={handleSaveSubjectChanges}
@@ -1384,217 +1385,162 @@ const EditClassPage: React.FC = () => {
                   >
                     Save Subject Changes
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setActiveStep(2)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                  >
-                    ← Back to Sections
-                  </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={handleSaveClassUpdates}
-                  disabled={isSaving}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer active:scale-95"
-                >
-                  <Save size={15} />
-                  <span>{isSaving ? "Saving..." : "Save All Changes"}</span>
-                </button>
+
               </div>
             </section>
           )}
         </div>
 
-        {/* ========================================================= */ }
-  {/* RIGHT COLUMN: ARCHITECTURE BLUEPRINT SIDEBAR (Col span 4) */ }
-  {/* ========================================================= */ }
-  <div className="lg:col-span-4 space-y-5">
-    {/* Architecture Blueprint Card */}
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-5 sticky top-6">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="font-bold text-slate-900 text-sm">Class Blueprint</h3>
-        </div>
-        <span className="text-[11px] font-semibold text-slate-500">
-          {completionPercentage}% Configured
-        </span>
-      </div>
+        {/* ========================================================= */}
+        {/* RIGHT COLUMN: ARCHITECTURE BLUEPRINT SIDEBAR (Col span 4) */}
+        {/* ========================================================= */}
+        <div className="lg:col-span-4 space-y-5">
+          {/* Architecture Blueprint Card */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-5 sticky top-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-sm">Class Blueprint</h3>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                {completionPercentage}% Configured
+              </span>
+            </div>
 
-      {/* Class Identity Summary */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">
-            Class Name
-          </span>
-          <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-            ID: #{id}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-base font-extrabold text-slate-900 tracking-tight">
-            {className || "Unnamed Class"}
-          </p>
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPublished
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-              : "bg-amber-50 text-amber-700 border border-amber-100"
-              }`}
-          >
-            {isPublished ? "PUBLISHED" : "DRAFT"}
-          </span>
-        </div>
+            {/* Class Identity Summary */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">
+                  Class Name
+                </span>
 
-      </div>
-
-      {/* Sections Blueprint */}
-      <div className="pt-3 border-t border-slate-100 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <Layers size={14} className="text-violet-600" />
-            Sections ({sections.length})
-          </span>
-          <button
-            type="button"
-            disabled={!canAccessStep2}
-            onClick={() => {
-              if (!canAccessStep2) {
-                toast.warning("Please save Class Identity (Step 1) first");
-                return;
-              }
-              setActiveStep(2);
-            }}
-            className={!canAccessStep2 ? "text-[10px] text-slate-300 cursor-not-allowed font-semibold" : "text-[10px] text-violet-600 hover:underline font-semibold cursor-pointer"}
-          >
-            Edit
-          </button>
-        </div>
-
-        {sections.length === 0 ? (
-          <p className="text-xs text-slate-400 italic">No sections created</p>
-        ) : (
-          <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-            {sections.map((sec) => {
-              const incId = sec.inchargeId ?? sec.incharge?.id;
-              const incName =
-                sec.incharge?.name ||
-                sec.incharge?.user?.name ||
-                (incId
-                  ? teachers.find((t) => t.id === Number(incId))?.name
-                  : "");
-
-              return (
-                <div
-                  key={sec.id || sec.name}
-                  className="p-2 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between text-xs"
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-base font-extrabold text-slate-900 tracking-tight">
+                  {className || "Unnamed Class"}
+                </p>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPublished
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                    : "bg-amber-50 text-amber-700 border border-amber-100"
+                    }`}
                 >
-                  <span className="font-semibold text-slate-800">{sec.name}</span>
-                  <span className="text-[10px] text-slate-500 truncate max-w-[120px]">
-                    {incName ? `Incharge: ${incName}` : "No incharge"}
+                  {isPublished ? "PUBLISHED" : "DRAFT"}
+                </span>
+              </div>
+
+            </div>
+
+            {/* Sections Blueprint */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Layers size={14} className="text-violet-600" />
+                  Sections ({sections.length})
+                </span>
+
+              </div>
+
+              {sections.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No sections created</p>
+              ) : (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {sections.map((sec) => {
+                    const incId = sec.inchargeId ?? sec.incharge?.id;
+                    const incName =
+                      sec.incharge?.name ||
+                      sec.incharge?.user?.name ||
+                      (incId
+                        ? teachers.find((t) => t.id === Number(incId))?.name
+                        : "");
+
+                    return (
+                      <div
+                        key={sec.id || sec.name}
+                        className="p-2 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between text-xs"
+                      >
+                        <span className="font-semibold text-slate-800">{sec.name}</span>
+                        <span className="text-[10px] text-slate-500 truncate max-w-[120px]">
+                          {incName ? `Incharge: ${incName}` : "No incharge"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Subjects Blueprint */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <GraduationCap size={14} className="text-emerald-600" />
+                  Subjects ({subjects.length})
+                </span>
+
+              </div>
+
+              {subjects.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No subjects added</p>
+              ) : (
+                <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto pr-1">
+                  {subjects.map((sub) => (
+                    <span
+                      key={sub.id || sub.name}
+                      className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium"
+                    >
+                      {sub.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+
+            {/* Live Readiness Checklist */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                Configuration Checklist:
+              </p>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center gap-2 text-slate-700">
+                  {isClassInfoValid ? (
+                    <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                  ) : (
+                    <AlertCircle size={14} className="text-slate-300 shrink-0" />
+                  )}
+                  <span className={isClassInfoValid ? "text-slate-800" : "text-slate-400"}>
+                    Class Name set
                   </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
-      {/* Subjects Blueprint */}
-      <div className="pt-3 border-t border-slate-100 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <GraduationCap size={14} className="text-emerald-600" />
-            Subjects ({subjects.length})
-          </span>
-          <button
-            type="button"
-            disabled={!canAccessStep3}
-            onClick={() => {
-              if (!canAccessStep3) {
-                toast.warning("Please save Sections (Step 2) first");
-                return;
-              }
-              setActiveStep(3);
-            }}
-            className={!canAccessStep3 ? "text-[10px] text-slate-300 cursor-not-allowed font-semibold" : "text-[10px] text-emerald-600 hover:underline font-semibold cursor-pointer"}
-          >
-            Edit
-          </button>
-        </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  {isSectionsValid ? (
+                    <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                  ) : (
+                    <AlertCircle size={14} className="text-slate-300 shrink-0" />
+                  )}
+                  <span className={isSectionsValid ? "text-slate-800" : "text-slate-400"}>
+                    At least 1 Section maintained
+                  </span>
+                </div>
 
-        {subjects.length === 0 ? (
-          <p className="text-xs text-slate-400 italic">No subjects added</p>
-        ) : (
-          <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto pr-1">
-            {subjects.map((sub) => (
-              <span
-                key={sub.id || sub.name}
-                className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium"
-              >
-                {sub.name}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-
-      {/* Live Readiness Checklist */}
-      <div className="pt-3 border-t border-slate-100 space-y-2">
-        <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-          Configuration Checklist:
-        </p>
-        <div className="space-y-1.5 text-xs">
-          <div className="flex items-center gap-2 text-slate-700">
-            {isClassInfoValid ? (
-              <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-            ) : (
-              <AlertCircle size={14} className="text-slate-300 shrink-0" />
-            )}
-            <span className={isClassInfoValid ? "text-slate-800" : "text-slate-400"}>
-              Class Name set
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-slate-700">
-            {isSectionsValid ? (
-              <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-            ) : (
-              <AlertCircle size={14} className="text-slate-300 shrink-0" />
-            )}
-            <span className={isSectionsValid ? "text-slate-800" : "text-slate-400"}>
-              At least 1 Section maintained
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-slate-700">
-            {isSubjectsValid ? (
-              <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-            ) : (
-              <AlertCircle size={14} className="text-slate-300 shrink-0" />
-            )}
-            <span className={isSubjectsValid ? "text-slate-800" : "text-slate-400"}>
-              Curriculum Subjects added
-            </span>
-          </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  {isSubjectsValid ? (
+                    <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                  ) : (
+                    <AlertCircle size={14} className="text-slate-300 shrink-0" />
+                  )}
+                  <span className={isSubjectsValid ? "text-slate-800" : "text-slate-400"}>
+                    Curriculum Subjects added
+                  </span>
+                </div>
 
               </div>
             </div>
 
-            {/* Primary Action Button */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleSaveClassUpdates}
-                disabled={isSaving}
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold shadow-sm shadow-indigo-600/30 hover:shadow-md transition-all cursor-pointer active:scale-95"
-              >
-                <Save size={16} />
-                <span>{isSaving ? "Saving Changes..." : "Save Class Changes"}</span>
-              </button>
-            </div>
+
           </div>
         </div>
       </div>

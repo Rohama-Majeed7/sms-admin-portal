@@ -111,7 +111,7 @@ const TeachersPage: React.FC = () => {
       const nextParams = new URLSearchParams(searchParams);
       if (!hasPage) nextParams.set("page", "1");
       if (!hasLimit) nextParams.set("limit", String(LIMIT));
-      if (!hasStatus) nextParams.set("status", "All");
+      if (!hasStatus) nextParams.set("status", "ALL");
       setSearchParams(nextParams, { replace: true });
     }
   }, []);
@@ -187,7 +187,6 @@ const TeachersPage: React.FC = () => {
       console.log("Form validation errors:", errors);
       return;
     }
-
     try {
       const res = await addSchoolTeacher({
         ...formData,

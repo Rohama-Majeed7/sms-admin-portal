@@ -438,8 +438,6 @@ const ViewClassPage: React.FC = () => {
             <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
               <School size={13} className="text-slate-400" />
               <span>{schoolName}</span>
-              <span className="text-slate-300">•</span>
-              <span>Published Curriculum & Schedule View (Read Only)</span>
             </p>
           </div>
         </div>
@@ -773,8 +771,8 @@ const ViewClassPage: React.FC = () => {
                 type="button"
                 onClick={() => setTimetableViewMode("grid")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${timetableViewMode === "grid"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
                   }`}
               >
                 <Grid size={13} />
@@ -784,8 +782,8 @@ const ViewClassPage: React.FC = () => {
                 type="button"
                 onClick={() => setTimetableViewMode("list")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${timetableViewMode === "list"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
                   }`}
               >
                 <ListFilter size={13} />
@@ -821,16 +819,16 @@ const ViewClassPage: React.FC = () => {
                     type="button"
                     onClick={() => setActiveTimetableSectionId(sec.id ?? sec.name)}
                     className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${isSelected
-                        ? "bg-indigo-600 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                       }`}
                   >
                     <span>{sec.name}</span>
                     {slotCount > 0 ? (
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${isSelected
-                            ? "bg-white/20 text-white"
-                            : "bg-emerald-100 text-emerald-700 font-semibold"
+                          ? "bg-white/20 text-white"
+                          : "bg-emerald-100 text-emerald-700 font-semibold"
                           }`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-emerald-500"}`} />

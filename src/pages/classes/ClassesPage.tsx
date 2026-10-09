@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   Plus,
@@ -20,7 +20,7 @@ import {
   deleteClassFromStorage,
 } from "./classesMockData";
 import { getAllClasses } from "../../apis/class/api.class";
-
+import { Pagination } from "../../components/shared/Pagination";
 const statusBadge = (status?: string) => {
   const isPublished =
     status?.toUpperCase() === "PUBLISHED" ||
@@ -42,28 +42,154 @@ const statusBadge = (status?: string) => {
     </span>
   );
 };
-
+const limit = 10;
 const ClassesPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Read URL query parameters
+  const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
+  const searchParam = searchParams.get("search") || "";
+
+  // Local state
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [classesList, setClassesList] = useState<ClassItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | "PUBLISHED" | "DRAFT">("All");
+  const [search, setSearch] = useState(searchParam);
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PUBLISHED" | "DRAFT">(() => {
+    const s = searchParams.get("status")?.toUpperCase();
+    if (s === "PUBLISHED" || s === "DRAFT") return s;
+    return "ALL";
+  });
   const school = JSON.parse(localStorage.getItem("user") || "{}");
   const schoolId = school?.schoolAdmin?.id;
+
+  // Sync URL search params helper
+  const updateUrlParams = (newParams: {
+    page?: number;
+    status?: string;
+    search?: string;
+  }) => {
+    setSearchParams((prev) => {
+      const nextParams = new URLSearchParams(prev);
+      const nextPage = newParams.page !== undefined ? newParams.page : 1;
+      nextParams.set("page", String(nextPage));
+      nextParams.set("limit", String(limit));
+
+      if (newParams.status !== undefined) {
+        nextParams.set("status", newParams.status);
+      } else if (!nextParams.has("status")) {
+        nextParams.set("status", "ALL");
+      }
+
+      if (newParams.search !== undefined) {
+        if (newParams.search.trim()) {
+          nextParams.set("search", newParams.search.trim());
+        } else {
+          nextParams.delete("search");
+        }
+      }
+
+      return nextParams;
+    });
+  };
+
+  // Ensure default URL query parameters are present on initial load
   useEffect(() => {
+    const hasPage = searchParams.has("page");
+    const hasLimit = searchParams.has("limit");
+    const hasStatus = searchParams.has("status");
+    if (!hasPage || !hasLimit || !hasStatus) {
+      setSearchParams(
+        (prev) => {
+          const nextParams = new URLSearchParams(prev);
+          if (!nextParams.has("page")) nextParams.set("page", "1");
+          if (!nextParams.has("limit")) nextParams.set("limit", String(limit));
+          if (!nextParams.has("status")) nextParams.set("status", "ALL");
+          return nextParams;
+        },
+        { replace: true }
+      );
+    }
+  }, []);
+
+  // Sync statusFilter when URL status changes (e.g. back/forward navigation)
+  useEffect(() => {
+    const s = searchParams.get("status")?.toUpperCase();
+    if (s === "PUBLISHED" || s === "DRAFT") {
+      setStatusFilter(s);
+    } else {
+      setStatusFilter("ALL");
+    }
+  }, [searchParams]);
+
+  // Sync local search input when URL search changes (e.g. back/forward navigation)
+  useEffect(() => {
+    setSearch(searchParam);
+  }, [searchParam]);
+
+  // Debounce search updates to URL params (only triggers fetch after 3+ characters or when cleared)
+  useEffect(() => {
+    const trimmed = search.trim();
+
+    // If search is cleared and URL has an active search param, clear it immediately
+    if (!trimmed) {
+      if (searchParam) {
+        updateUrlParams({ search: "", page: 1 });
+      }
+      return;
+    }
+
+    // If fewer than 3 characters
+    if (trimmed.length < 3) {
+      // If a search was previously active in URL, reset to full list after debounce
+      if (searchParam) {
+        const timer = setTimeout(() => {
+          updateUrlParams({ search: "", page: 1 });
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
+
+    // When 3 or more characters and different from URL searchParam, update after 500ms debounce
+    if (trimmed !== searchParam) {
+      const timer = setTimeout(() => {
+        updateUrlParams({ search: trimmed, page: 1 });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [search, searchParam]);
+
+  // Fetch classes when schoolId, pagination, status, or debounced searchParam changes
+  useEffect(() => {
+    if (!schoolId) return;
+
     const fetchClasses = async () => {
+      setIsLoading(true);
       try {
-        const response = await getAllClasses(Number(schoolId));
+        const response = await getAllClasses(
+          Number(schoolId),
+          Number(currentPage),
+          Number(limit),
+          searchParam,
+          statusFilter
+        );
         if (response?.success) {
           setClassesList(response?.data || []);
+          setTotalItems(response?.pagination?.total || 0);
+          setTotalPages(Math.ceil((response?.pagination?.total || 0) / limit) || 1);
         }
       } catch (error: any) {
         console.error(error?.response?.data?.message);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
     fetchClasses();
-  }, []);
+  }, [schoolId, currentPage, statusFilter, searchParam]);
 
   const handleDeleteClass = (id: string | number | undefined, name: string) => {
     if (!id) return;
@@ -74,34 +200,14 @@ const ClassesPage: React.FC = () => {
     }
   };
 
-  // Filtered classes
-  const filteredClasses = classesList.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      (item.code || "").toLowerCase().includes(search.toLowerCase()) ||
-      (item.academicYear || "").toLowerCase().includes(search.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "All"
-        ? true
-        : statusFilter === "PUBLISHED"
-        ? item.status?.toUpperCase() === "PUBLISHED" ||
-          item.status?.toUpperCase() === "PUBLISH" ||
-          item.status === "Active"
-        : !item.status ||
-          item.status?.toUpperCase() === "DRAFT" ||
-          item.status === "Inactive";
-
-    return matchesSearch && matchesStatus;
-  });
 
   // Calculate quick stats
-  const totalClasses = classesList.length;
-  const totalSections = classesList.reduce(
+  const totalClasses = classesList?.length;
+  const totalSections = classesList?.reduce(
     (acc, curr) => acc + (curr.sections?.length || 0),
     0
   );
-  const totalSubjects = classesList.reduce(
+  const totalSubjects = classesList?.reduce(
     (acc, curr) => acc + (curr.subjects?.length || 0),
     0
   );
@@ -176,7 +282,7 @@ const ClassesPage: React.FC = () => {
           />
           <input
             type="text"
-            placeholder="Search by class name, code, or academic year..."
+            placeholder="Search by class name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
@@ -184,7 +290,10 @@ const ClassesPage: React.FC = () => {
           {search && (
             <button
               type="button"
-              onClick={() => setSearch("")}
+              onClick={() => {
+                setSearch("");
+                updateUrlParams({ search: "", page: 1 });
+              }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
               title="Clear search"
             >
@@ -196,11 +305,14 @@ const ClassesPage: React.FC = () => {
         {/* Status Filter Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
           <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
-            {(["All", "PUBLISHED", "DRAFT"] as const).map((status) => (
+            {(["ALL", "PUBLISHED", "DRAFT"] as const).map((status) => (
               <button
                 key={status}
                 type="button"
-                onClick={() => setStatusFilter(status)}
+                onClick={() => {
+                  setStatusFilter(status);
+                  updateUrlParams({ status, page: 1 });
+                }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${statusFilter === status
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-500 hover:text-slate-900"
@@ -220,10 +332,10 @@ const ClassesPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="text-indigo-600" />
             <h2 className="font-bold text-slate-900 text-sm">
-              Created Classes Directory
+              Classes Directory
             </h2>
             <span className="text-xs text-slate-400">
-              ({filteredClasses.length} shown)
+              ({classesList?.length} shown)
             </span>
           </div>
         </div>
@@ -243,7 +355,7 @@ const ClassesPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-              {filteredClasses.length === 0 ? (
+              {classesList?.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
                     <BookOpen size={36} className="mx-auto text-slate-300 mb-2" />
@@ -254,7 +366,7 @@ const ClassesPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredClasses.map((item) => (
+                classesList?.map((item) => (
                   <tr
                     key={item.id}
                     className="hover:bg-slate-50/60 transition-colors group"
@@ -390,13 +502,13 @@ const ClassesPage: React.FC = () => {
 
         {/* Mobile View Cards */}
         <div className="md:hidden divide-y divide-slate-100">
-          {filteredClasses.length === 0 ? (
+          {classesList?.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-sm">
               <BookOpen size={32} className="mx-auto text-slate-300 mb-2" />
               <p className="font-semibold text-slate-700">No classes found</p>
             </div>
           ) : (
-            filteredClasses.map((item) => (
+            classesList?.map((item) => (
               <div key={item.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
@@ -488,6 +600,19 @@ const ClassesPage: React.FC = () => {
             ))
           )}
         </div>
+
+
+        {/* Reusable Pagination */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          limit={limit}
+          itemLabel="classes"
+          onPageChange={(page) => updateUrlParams({ page })}
+          disabled={isLoading}
+        />
+
       </section>
     </div>
   );

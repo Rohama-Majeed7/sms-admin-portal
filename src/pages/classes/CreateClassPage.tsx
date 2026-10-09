@@ -34,7 +34,6 @@ const CLASS_NAME_SUGGESTIONS = [
   "Grade 6",
   "Grade 5",
   "Matriculation",
-  "O-Levels Prep",
 ];
 
 // Quick suggestion chips for common curriculum subjects
@@ -418,13 +417,12 @@ const CreateClassPage: React.FC = () => {
           </Link>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Create Class Architecture
+              Create Class
             </h1>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-              <School size={12} />
-              School ID: #{schoolId}
-            </span>
+
             <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+              <School size={12} />
+
               {schoolName}
             </span>
           </div>
@@ -448,7 +446,7 @@ const CreateClassPage: React.FC = () => {
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold shadow-sm shadow-indigo-600/30 hover:shadow-md transition-all cursor-pointer active:scale-95"
           >
             <Save size={16} />
-            <span>{isSubmittingAll ? "Saving Class..." : "Publish & Create Class"}</span>
+            <span>{isSubmittingAll ? "Saving Class..." : "Publish  Class"}</span>
           </button>
         </div>
       </div>
@@ -493,10 +491,10 @@ const CreateClassPage: React.FC = () => {
             setActiveStep(2);
           }}
           className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 ${!isClassSavedOnServer
-              ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-200"
-              : activeStep === 2
-                ? "bg-violet-50/70 border-violet-400 ring-2 ring-violet-500/20 shadow-xs cursor-pointer"
-                : "bg-white border-slate-200/90 hover:border-slate-300 cursor-pointer"
+            ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-200"
+            : activeStep === 2
+              ? "bg-violet-50/70 border-violet-400 ring-2 ring-violet-500/20 shadow-xs cursor-pointer"
+              : "bg-white border-slate-200/90 hover:border-slate-300 cursor-pointer"
             }`}
         >
           <div
@@ -530,10 +528,10 @@ const CreateClassPage: React.FC = () => {
             setActiveStep(3);
           }}
           className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 ${!isClassSavedOnServer || sections.length === 0
-              ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-200"
-              : activeStep === 3
-                ? "bg-emerald-50/70 border-emerald-400 ring-2 ring-emerald-500/20 shadow-xs cursor-pointer"
-                : "bg-white border-slate-200/90 hover:border-slate-300 cursor-pointer"
+            ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-200"
+            : activeStep === 3
+              ? "bg-emerald-50/70 border-emerald-400 ring-2 ring-emerald-500/20 shadow-xs cursor-pointer"
+              : "bg-white border-slate-200/90 hover:border-slate-300 cursor-pointer"
             }`}
         >
           <div
@@ -606,9 +604,7 @@ const CreateClassPage: React.FC = () => {
                     className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
                     required
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    This identifier represents the academic grade tier across the portal and student registers.
-                  </p>
+
                 </div>
 
                 {/* Quick Suggestion Pills */}
@@ -1090,9 +1086,7 @@ const CreateClassPage: React.FC = () => {
                 <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">
                   Class Name
                 </span>
-                <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                  School #{schoolId}
-                </span>
+
               </div>
               <p className="text-base font-extrabold text-slate-900 tracking-tight">
                 {className || "Unnamed Class"}
@@ -1107,20 +1101,7 @@ const CreateClassPage: React.FC = () => {
                   <Layers size={14} className="text-violet-600" />
                   Sections ({sections.length})
                 </span>
-                <button
-                  type="button"
-                  disabled={!isClassSavedOnServer}
-                  onClick={() => {
-                    if (!isClassSavedOnServer) {
-                      toast.warning("Please save class basic information first");
-                      return;
-                    }
-                    setActiveStep(2);
-                  }}
-                  className={!isClassSavedOnServer ? "text-[10px] text-slate-300 cursor-not-allowed font-semibold" : "text-[10px] text-violet-600 hover:underline font-semibold cursor-pointer"}
-                >
-                  Edit
-                </button>
+
               </div>
 
               {sections.length === 0 ? (
@@ -1149,24 +1130,7 @@ const CreateClassPage: React.FC = () => {
                   <GraduationCap size={14} className="text-emerald-600" />
                   Subjects ({subjects.length})
                 </span>
-                <button
-                  type="button"
-                  disabled={!isClassSavedOnServer || sections.length === 0}
-                  onClick={() => {
-                    if (!isClassSavedOnServer) {
-                      toast.warning("Please save class basic information first");
-                      return;
-                    }
-                    if (sections.length === 0) {
-                      toast.warning("Please add at least one section in Step 2 first");
-                      return;
-                    }
-                    setActiveStep(3);
-                  }}
-                  className={!isClassSavedOnServer || sections.length === 0 ? "text-[10px] text-slate-300 cursor-not-allowed font-semibold" : "text-[10px] text-emerald-600 hover:underline font-semibold cursor-pointer"}
-                >
-                  Edit
-                </button>
+
               </div>
 
               {subjects.length === 0 ? (
@@ -1226,18 +1190,7 @@ const CreateClassPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Primary Action Button */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleCompleteClassCreation}
-                disabled={isSubmittingAll}
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold shadow-sm shadow-indigo-600/30 hover:shadow-md transition-all cursor-pointer active:scale-95"
-              >
-                <Save size={16} />
-                <span>{isSubmittingAll ? "Publishing Class..." : "Create & Finish Class"}</span>
-              </button>
-            </div>
+
           </div>
         </div>
       </div>

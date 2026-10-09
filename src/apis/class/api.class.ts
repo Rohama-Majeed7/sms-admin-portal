@@ -50,10 +50,14 @@ export const getClassById = async (classId: number | string, schoolId: number) =
     });
     return response.data;
 };
-export const getAllClasses = async (schoolId: number) => {
+export const getAllClasses = async (schoolId: number, page: number, limit: number, search: string, status: string) => {
     const response = await api.get(`/class`, {
         params: {
-            schoolId: schoolId
+            schoolId: schoolId,
+            page: page,
+            limit: limit,
+            search: search,
+            status: status,
         }
     });
     return response.data;
