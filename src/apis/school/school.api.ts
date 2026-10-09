@@ -14,7 +14,7 @@ export const getSchoolById = async (schoolId: number) => {
   const response = await api.get(`school/${schoolId}`);
   return response.data;
 };
-export const getSchoolTeachers = async (schoolId: number, params: any) => {
+export const getSchoolTeachers = async (schoolId: number, params?: any) => {
   const response = await api.get(`school/${schoolId}/teachers`, { params });
   return response.data;
 };

@@ -13,6 +13,11 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import { ToastContainer } from "react-toastify";
 import StudentDetailsPage from "./pages/students/StudentDetailsPage";
 import TeacherDetailsPage from "./pages/teachers/TeacherDetailsPage";
+import ClassesPage from "./pages/classes/ClassesPage";
+import CreateClassPage from "./pages/classes/CreateClassPage";
+import EditClassPage from "./pages/classes/EditClassPage";
+import ViewClassPage from "./pages/classes/ViewClassPage";
+import TimetablePage from "./pages/timetable/TimetablePage";
 
 const isAuthenticated = () => !!localStorage.getItem("accessToken");
 const isAdmin = () => {
@@ -128,6 +133,94 @@ const App = () => {
             }
           />
 
+          {/* Protected Classes route — requires active school */}
+          <Route
+            path="/classes"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Classes" activePath="/classes">
+                    <ClassesPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+          <Route
+            path="/classes/create"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Create Class" activePath="/classes">
+                    <CreateClassPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+          <Route
+            path="/classes/edit/:id"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Edit Class" activePath="/classes">
+                    <EditClassPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+          <Route
+            path="/classes/:id/edit"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Edit Class" activePath="/classes">
+                    <EditClassPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+          <Route
+            path="/classes/view/:id"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Class Details" activePath="/classes">
+                    <ViewClassPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+          <Route
+            path="/classes/:id/view"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Class Details" activePath="/classes">
+                    <ViewClassPage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+
+          {/* Protected Timetable route — requires active school */}
+          <Route
+            path="/timetable"
+            element={
+              <ActiveSchoolRoute
+                element={
+                  <AdminLayout pageTitle="Timetable" activePath="/timetable">
+                    <TimetablePage />
+                  </AdminLayout>
+                }
+              />
+            }
+          />
+
           {/* Protected Teachers route — requires active school */}
           <Route
             path="/teachers"
@@ -210,6 +303,14 @@ const App = () => {
           <Route
             path="/dashboard/students"
             element={<Navigate to="/students" replace />}
+          />
+          <Route
+            path="/dashboard/classes"
+            element={<Navigate to="/classes" replace />}
+          />
+          <Route
+            path="/dashboard/timetable"
+            element={<Navigate to="/timetable" replace />}
           />
 
           {/* Redirect /dashboard/settings to /settings */}

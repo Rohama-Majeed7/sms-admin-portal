@@ -11,6 +11,8 @@ import {
   Settings,
   Users,
   GraduationCap,
+  BookOpen,
+  Calendar,
 } from "lucide-react";
 import { logout } from "../apis/auth/auth.service";
 
@@ -19,6 +21,16 @@ const navItems = [
     label: "Dashboard",
     path: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Classes",
+    path: "/classes",
+    icon: BookOpen,
+  },
+  {
+    label: "Timetable",
+    path: "/timetable",
+    icon: Calendar,
   },
   {
     label: "Teachers",
