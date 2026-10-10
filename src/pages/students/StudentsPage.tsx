@@ -10,13 +10,18 @@ import {
   AlertCircle,
   Eye,
   Trash2,
+  BookOpen,
+  Loader2,
 } from "lucide-react";
 import type { StudentStatus } from "../../types/student";
+import type { ClassItem, ClassSection } from "../../types/class";
 import {
   addSchoolStudent,
   deleteSchoolStudent,
   getSchoolStudents,
 } from "../../apis/school/school.api";
+import { getAllClasses, getClassById } from "../../apis/class/api.class";
+import { addStudentToSection, removeStudentSection } from "../../apis/section/section.api";
 import {
   validatePersonName,
   validateEmail,
@@ -71,7 +76,6 @@ const StudentsPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
-
   const school =
     JSON.parse(localStorage.getItem("user") || "{}")?.schoolAdmin || null;
 
@@ -185,6 +189,121 @@ const StudentsPage: React.FC = () => {
     }
   };
 
+  // Assign Class Modal State
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedStudentForAssign, setSelectedStudentForAssign] = useState<any | null>(null);
+  const [classesList, setClassesList] = useState<ClassItem[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState<string | number>("");
+  const [sectionsList, setSectionsList] = useState<ClassSection[]>([]);
+  const [isLoadingSections, setIsLoadingSections] = useState(false);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | number>("");
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  const handleOpenAssignModal = async (student: any) => {
+    setSelectedStudentForAssign(student);
+    setSelectedClassId("");
+    setSelectedSectionId("");
+    setSectionsList([]);
+    setIsAssignModalOpen(true);
+
+    if (classesList.length === 0) {
+      setIsLoadingClasses(true);
+      try {
+        const schoolId = school?.id || 1;
+        const res = await getAllClasses(schoolId, 1, 100, "", "");
+        if (res?.success) {
+          setClassesList(res.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load classes", err);
+        toast.error("Failed to load classes.");
+      } finally {
+        setIsLoadingClasses(false);
+      }
+    }
+  };
+
+  const handleClassChange = async (classId: string | number) => {
+    setSelectedClassId(classId);
+    setSelectedSectionId("");
+    setSectionsList([]);
+
+    if (!classId) return;
+
+    const currentClass = classesList.find((c) => String(c.id) === String(classId));
+    if (currentClass?.sections && currentClass.sections.length > 0) {
+      setSectionsList(currentClass.sections);
+    } else {
+      setIsLoadingSections(true);
+      try {
+        const schoolId = school?.id || 1;
+        const res = await getClassById(classId, schoolId);
+        if (res?.success && res.data?.sections) {
+          setSectionsList(res.data.sections);
+        } else {
+          setSectionsList([]);
+        }
+      } catch (err) {
+        console.error("Failed to load class sections", err);
+        setSectionsList([]);
+      } finally {
+        setIsLoadingSections(false);
+      }
+    }
+  };
+
+  const handleAssignStudent = async () => {
+    if (!selectedStudentForAssign?.id) {
+      toast.error("Please select a student.");
+      return;
+    }
+    if (!selectedSectionId) {
+      toast.warning("Please select a section.");
+      return;
+    }
+
+    try {
+      setIsAssigning(true);
+      const res = await addStudentToSection(
+        selectedStudentForAssign.id,
+        selectedSectionId
+      );
+      if (res?.success) {
+        toast.success(res?.message || "Student assigned to section successfully!");
+        setIsAssignModalOpen(false);
+        setSelectedStudentForAssign(null);
+        setRefetchTrigger((prev) => prev + 1);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to assign student to section.";
+      toast.error(message);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+  const handleRemoveStudent = async (studentId: number | string) => {
+    try {
+      setIsAssigning(true);
+      const res = await removeStudentSection(studentId);
+      if (res?.success) {
+        toast.success(res?.message || "Student removed from section successfully!");
+        setIsAssigning(false);
+        setRefetchTrigger((prev) => prev + 1);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to remove student from section.";
+      toast.error(message);
+    } finally {
+      setIsAssigning(false);
+    }
+  }
   // Fetch students with backend pagination, status, and search
   useEffect(() => {
     const fetchStudents = async () => {
@@ -465,9 +584,8 @@ const StudentsPage: React.FC = () => {
               <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="py-3 px-5">Student Name</th>
                 <th className="py-3 px-4"> Email</th>
-                {/* <th className="py-3 px-4">Class & Sec</th> */}
-                {/* <th className="py-3 px-4">Contact</th> */}
-                {/* <th className="py-3 px-4">Gender</th> */}
+
+                <th className="py-3 px-4">Assign Class</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-5 text-right">Actions</th>
               </tr>
@@ -476,7 +594,7 @@ const StudentsPage: React.FC = () => {
               {students?.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="py-12 text-center text-slate-400 text-sm"
                   >
                     <GraduationCap
@@ -519,6 +637,28 @@ const StudentsPage: React.FC = () => {
                           </span>
                         </div>
                       </div>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      {student?.sectionId ? (
+                        <button onClick={() => handleRemoveStudent(student.id)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80">
+                          <X size={12} className="text-red-500" />
+                          UnAssign Class
+                        </button>
+                      ) : (<button
+                        type="button"
+                        disabled={student?.isVerified}
+                        onClick={() => handleOpenAssignModal(student)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${student?.isVerified
+                          ? "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80"
+                          : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80"
+                          } transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95`}
+                      >
+                        <BookOpen size={13} className="text-indigo-600" />
+                        <span>Assign Class</span>
+                      </button>)}
+
+
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -592,6 +732,17 @@ const StudentsPage: React.FC = () => {
                     <span className="text-slate-700 truncate max-w-[190px]">
                       {student?.email}
                     </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60">
+                    <span className="text-slate-400 font-medium">Class:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAssignModal(student)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all cursor-pointer"
+                    >
+                      <BookOpen size={12} className="text-indigo-600" />
+                      <span>Assign Class</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -867,6 +1018,157 @@ const StudentsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Class Modal */}
+      {isAssignModalOpen && selectedStudentForAssign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                  <BookOpen size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Assign Class & Section
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Allocate student to their class section
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  setSelectedStudentForAssign(null);
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Selected Student Information Card */}
+              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-violet-100/70 border border-violet-200 text-violet-700 font-bold text-xs flex items-center justify-center shrink-0">
+                  {getInitials(selectedStudentForAssign.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-900 truncate">
+                    {selectedStudentForAssign.name}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {selectedStudentForAssign.email}
+                  </p>
+
+                </div>
+              </div>
+
+              {/* Class Selection */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                  <span>Select Class *</span>
+                  {isLoadingClasses && (
+                    <span className="text-[11px] text-indigo-600 flex items-center gap-1 font-normal">
+                      <Loader2 size={11} className="animate-spin" />
+                      Loading classes...
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => handleClassChange(e.target.value)}
+                  disabled={isLoadingClasses || isAssigning}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+                >
+                  <option value="">-- Choose a Class --</option>
+                  {classesList.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </option>
+                  ))}
+                </select>
+                {classesList.length === 0 && !isLoadingClasses && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    No classes available. Please create a class first.
+                  </p>
+                )}
+              </div>
+
+              {/* Section Selection */}
+              {selectedClassId && (
+                <div className="space-y-1.5 animate-in fade-in duration-150">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                    <span>Select Section *</span>
+                    {isLoadingSections && (
+                      <span className="text-[11px] text-indigo-600 flex items-center gap-1 font-normal">
+                        <Loader2 size={11} className="animate-spin" />
+                        Loading sections...
+                      </span>
+                    )}
+                  </label>
+
+                  {isLoadingSections ? (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center text-xs text-slate-400">
+                      Loading sections for selected class...
+                    </div>
+                  ) : sectionsList.length === 0 ? (
+                    <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                      <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-600" />
+                      <span>
+                        No sections found for this class. Please add a section to this class before assigning students.
+                      </span>
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedSectionId}
+                      onChange={(e) => setSelectedSectionId(e.target.value)}
+                      disabled={isAssigning}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+                    >
+                      <option value="">-- Choose a Section --</option>
+                      {sectionsList.map((sec) => (
+                        <option key={sec.id} value={sec.id}>
+                          {sec.name} {sec.incharge ? `(Incharge: ${sec.incharge.name || sec.incharge.user?.name || ''})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 sm:px-6 sm:py-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  setSelectedStudentForAssign(null);
+                }}
+                disabled={isAssigning}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAssignStudent}
+                disabled={!selectedClassId || !selectedSectionId || isAssigning}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold shadow-xs shadow-indigo-600/30 cursor-pointer transition-all"
+              >
+                {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                <span>{isAssigning ? "Assigning..." : "Assign Section"}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
