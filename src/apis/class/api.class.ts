@@ -37,7 +37,7 @@ export const updateClass = async (
     return response.data;
 };
 
-export const createSection = async (payload: { name: string, classId?: number, inchargeId?: number }) => {
+export const createSection = async (payload: { name: string, classId?: number, inchargeId?: number, studentCapacity?: number }) => {
     const response = await api.post("/class/create/section", payload);
     return response.data;
 };
@@ -50,7 +50,7 @@ export const getClassById = async (classId: number | string, schoolId: number) =
     });
     return response.data;
 };
-export const getAllClasses = async (schoolId: number, page: number, limit: number, search: string, status: string) => {
+export const getAllClasses = async (schoolId: number, page?: number, limit?: number, search?: string, status?: string) => {
     const response = await api.get(`/class`, {
         params: {
             schoolId: schoolId,

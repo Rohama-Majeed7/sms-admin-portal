@@ -105,7 +105,7 @@ const EditClassPage: React.FC = () => {
   // Section Form States
   const [newSectionName, setNewSectionName] = useState<string>("");
   const [newSectionInchargeId, setNewSectionInchargeId] = useState<string>("");
-
+  const [newSectionCapacity, setNewSectionCapacity] = useState<string>("");
   // Subject Form States
   const [newSubjectName, setNewSubjectName] = useState<string>("");
 
@@ -325,6 +325,7 @@ const EditClassPage: React.FC = () => {
           email: matchedTeacher.email,
         }
         : null,
+      studentCapacity: Number(newSectionCapacity),
       classId: Number(id),
     };
 
@@ -332,6 +333,7 @@ const EditClassPage: React.FC = () => {
     setIsStep2Saved(false);
     setNewSectionName("");
     setNewSectionInchargeId("");
+    setNewSectionCapacity("");
     toast.success(`Section ${trimmed} added`);
   };
 
@@ -527,6 +529,7 @@ const EditClassPage: React.FC = () => {
               name: sec.name,
               classId: numericId,
               inchargeId: sec.inchargeId ? Number(sec.inchargeId) : (sec.incharge?.id ? Number(sec.incharge?.id) : null),
+              studentCapacity: sec.studentCapacity,
             })),
             subjects: subjects.map((sub) => ({
               name: sub.name,
@@ -1052,6 +1055,20 @@ const EditClassPage: React.FC = () => {
                         );
                       })}
                     </select>
+                  </div>
+
+                  {/* Student Capacity */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Student Capacity
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Enter capacity (e.g. 40)"
+                      value={newSectionCapacity}
+                      onChange={(e) => setNewSectionCapacity(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
+                    />
                   </div>
                 </div>
 

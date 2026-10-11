@@ -2,6 +2,7 @@ export interface ClassSection {
   id?: number | string;
   name: string;
   inchargeId?: number | null;
+  studentCapacity?: number;
 
   incharge?: {
     id?: number;
@@ -77,6 +78,7 @@ export interface UpdateClassPayload {
     name: string;
     classId?: number | null;
     inchargeId?: number | null;
+    studentCapacity?: number;
   }>;
   subjects?: Array<{
     name: string;
