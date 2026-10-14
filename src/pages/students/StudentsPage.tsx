@@ -49,7 +49,8 @@ const statusBadge = (status: StudentStatus) => {
   );
 };
 
-const getInitials = (name: string) => {
+const getInitials = (name?: string) => {
+  if (!name) return "";
   return name
     .split(" ")
     .filter(Boolean)
@@ -201,12 +202,12 @@ const StudentsPage: React.FC = () => {
   const [isAssigning, setIsAssigning] = useState(false);
 
   const handleOpenAssignModal = async (student: any) => {
+
     setSelectedStudentForAssign(student);
     setSelectedClassId("");
     setSelectedSectionId("");
     setSectionsList([]);
     setIsAssignModalOpen(true);
-
     if (classesList.length === 0) {
       setIsLoadingClasses(true);
       try {
@@ -645,18 +646,16 @@ const StudentsPage: React.FC = () => {
                           <X size={12} className="text-red-500" />
                           UnAssign Class
                         </button>
-                      ) : (<button
-                        type="button"
-                        disabled={student?.isVerified}
-                        onClick={() => handleOpenAssignModal(student)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${student?.isVerified
-                          ? "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80"
-                          : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80"
-                          } transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95`}
-                      >
-                        <BookOpen size={13} className="text-indigo-600" />
-                        <span>Assign Class</span>
-                      </button>)}
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAssignModal(student)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
+                        >
+                          <BookOpen size={13} className="text-indigo-600" />
+                          <span>Assign Class</span>
+                        </button>
+                      )}
 
 
                     </td>
@@ -735,14 +734,25 @@ const StudentsPage: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60">
                     <span className="text-slate-400 font-medium">Class:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenAssignModal(student)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all cursor-pointer"
-                    >
-                      <BookOpen size={12} className="text-indigo-600" />
-                      <span>Assign Class</span>
-                    </button>
+                    {student?.sectionId ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveStudent(student.id)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 transition-all cursor-pointer"
+                      >
+                        <X size={12} className="text-red-500" />
+                        <span>UnAssign Class</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAssignModal(student)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all cursor-pointer"
+                      >
+                        <BookOpen size={12} className="text-indigo-600" />
+                        <span>Assign Class</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
